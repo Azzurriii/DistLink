@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${APP_PORT}:${APP_PORT}"
+    environment:
+      - NODE_ENV=${NODE_ENV}
+      - SCYLLA_HOST=${SCYLLA_HOST}
+      - SCYLLA_PORT=${SCYLLA_PORT}
+      - SCYLLA_USERNAME=${SCYLLA_USERNAME}
+      - SCYLLA_PASSWORD=${SCYLLA_PASSWORD}
+      - SCYLLA_KEYSPACE=${SCYLLA_KEYSPACE}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_DB=${REDIS_DB}
+      - KAFKA_BROKERS=${KAFKA_BROKERS}
+      - KAFKA_CLIENT_ID=${KAFKA_CLIENT_ID}
+      - KAFKA_GROUP_ID=${KAFKA_GROUP_ID}
+      - CLICKHOUSE_HOST=${CLICKHOUSE_HOST}
+      - CLICKHOUSE_PORT=${CLICKHOUSE_PORT}
+      - CLICKHOUSE_DATABASE=${CLICKHOUSE_DATABASE}
+      - RATE_LIMIT_TTL=${RATE_LIMIT_TTL}
+      - RATE_LIMIT_LIMIT=${RATE_LIMIT_LIMIT}
+      - SAFE_BROWSING_API_KEY=${SAFE_BROWSING_API_KEY}
+    depends_on:
+      - scylla
+      - redis
+      - kafka
+      - clickhouse
+    volumes:
+      - .:/app
+      - /app/node_modules
+
+  scylla:
+    image: scylladb/scylla:5.4.0
+    ports:
+      - "9042:9042"
+    environment:
+      - SCYLLA_USERNAME=${SCYLLA_USERNAME}
+      - SCYLLA_PASSWORD=${SCYLLA_PASSWORD}
+    volumes:
+      - scylla_data:/var/lib/scylla
+    command: --smp 1 --memory 512M --overprovisioned 1
+
+  redis:
+    image: redis:7.2-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.1
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.1
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.8
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+
+volumes:
+  scylla_data:
+  redis_data:
+  clickhouse_data: 
