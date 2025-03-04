@@ -1,22 +1,26 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsUrl, IsOptional, IsDate } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsUrl, IsEnum } from 'class-validator';
+
+export enum ExpirationOption {
+  FOREVER = 'FOREVER',
+  ONE_DAY = '1D',
+  SEVEN_DAYS = '7D',
+  THIRTY_DAYS = '30D',
+}
 
 export class CreateUrlDto {
   @ApiProperty({
     description: 'Original URL to shorten',
-    example: 'https://example.com/very-long-url'
+    example: 'https://example.com/very-long-url',
   })
   @IsUrl()
   originalUrl: string;
 
   @ApiProperty({
-    description: 'Expiration date for the URL',
-    required: false,
-    example: '2025-03-04T00:00:00.000Z'
+    description: 'URL expiration option',
+    enum: ExpirationOption,
+    default: ExpirationOption.FOREVER,
   })
-  @IsOptional()
-  @Type(() => Date)
-  @IsDate()
-  expiresAt?: Date;
+  @IsEnum(ExpirationOption)
+  expiration: ExpirationOption = ExpirationOption.FOREVER;
 }

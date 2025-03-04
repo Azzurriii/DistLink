@@ -4,4 +4,5 @@ export interface IUrl {
   created_at: Date;
   expires_at?: Date;
   clicks: number;
+  new_url?: string;
 }

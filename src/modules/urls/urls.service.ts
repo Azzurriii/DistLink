@@ -6,21 +6,19 @@ import { UrlResponseDto } from './dto/url-response.dto';
 import { IUrl } from './interfaces/url.interface';
 import { DatabaseService } from '../database/database.service';
 import { RedisService } from '../redis/redis.service';
+import { ExpirationOption } from './dto/create-url.dto';
 
 @Injectable()
 export class UrlsService {
   private readonly logger = new Logger(UrlsService.name);
-  private readonly CACHE_TTL = 3600; // 1 hour in seconds
-  private readonly CACHE_PREFIX = 'url:';
   private readonly redisKeyPrefix: string;
   private readonly redisTTL: number;
 
   constructor(
     private readonly databaseService: DatabaseService,
-    private configService: ConfigService,
-    private redisService: RedisService,
+    private readonly configService: ConfigService,
+    private readonly redisService: RedisService,
   ) {
-    // Lấy cấu hình từ redis config
     this.redisKeyPrefix = this.configService.get('redis.keyPrefix');
     this.redisTTL = this.configService.get('redis.ttl');
   }
@@ -29,120 +27,165 @@ export class UrlsService {
     return `${this.redisKeyPrefix}urls:${key}`;
   }
 
+  private calculateExpirationDate(expiration: ExpirationOption): Date | null {
+    if (expiration === ExpirationOption.FOREVER) {
+      return null;
+    }
+
+    const now = new Date();
+    switch (expiration) {
+      case ExpirationOption.ONE_DAY:
+        return new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      case ExpirationOption.SEVEN_DAYS:
+        return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      case ExpirationOption.THIRTY_DAYS:
+        return new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      default:
+        return null;
+    }
+  }
+
   async create(dto: CreateUrlDto): Promise<UrlResponseDto> {
     const client = this.databaseService.getClient();
     const shortCode = await this.generateUniqueShortCode();
     const now = new Date();
-    const expiresAt = dto.expiresAt;
+    const expiresAt = this.calculateExpirationDate(dto.expiration);
 
     await client.execute(
-      `
-      INSERT INTO urls (
-        short_code,
-        original_url,
-        created_at,
-        expires_at
-      ) VALUES (?, ?, ?, ?)
-      `,
+      'INSERT INTO urls (short_code, original_url, created_at, expires_at) VALUES (?, ?, ?, ?)',
       [shortCode, dto.originalUrl, now, expiresAt],
-      { prepare: true }
+      { prepare: true },
     );
 
     await client.execute(
-      `UPDATE url_clicks SET clicks = clicks + 0 WHERE short_code = ?`,
+      'UPDATE url_clicks SET clicks = clicks + 0 WHERE short_code = ?',
       [shortCode],
-      { prepare: true }
+      { prepare: true },
     );
 
-    // Invalidate the all_urls cache
-    await this.redisService.del(this.getRedisKey('all'));
+    await this.invalidateCache('all');
 
-    return new UrlResponseDto({
+    return this.createUrlResponse(
       shortCode,
-      originalUrl: dto.originalUrl,
-      createdAt: now,
-      expiresAt: dto.expiresAt,
-      clicks: 0,
-      newUrl: `${this.configService.get('BASE_URL')}/${shortCode}`,
-    });
+      dto.originalUrl,
+      now,
+      expiresAt,
+      0,
+    );
   }
 
   async findByShortCode(shortCode: string): Promise<IUrl> {
-    const client = this.databaseService.getClient();
+    const cachedUrl = await this.getFromCache(shortCode);
+    if (cachedUrl) return cachedUrl;
 
-    const [urlResult, clicksResult] = await Promise.all([
-      client.execute(
-        'SELECT short_code, original_url, created_at, expires_at FROM urls WHERE short_code = ?',
-        [shortCode],
-        { prepare: true },
-      ),
-      client.execute(
-        'UPDATE url_clicks SET clicks = clicks + 1 WHERE short_code = ?',
-        [shortCode],
-        { prepare: true },
-      ),
-    ]);
+    const url = await this.getUrlFromDatabase(shortCode);
+    if (!url) throw new NotFoundException('URL not found');
 
-    if (!urlResult.rows.length) {
-      throw new NotFoundException('URL not found');
-    }
-
-    const url = {
-      short_code: urlResult.first().short_code,
-      original_url: urlResult.first().original_url,
-      created_at: urlResult.first().created_at,
-      expires_at: urlResult.first().expires_at,
-      clicks: clicksResult.first()?.clicks || 0,
-      newUrl: `${this.configService.get('BASE_URL')}/${shortCode}`,
-    } as IUrl;
-
-    if (url.expires_at && url.expires_at < new Date()) {
-      await client.execute(
-        'DELETE FROM urls WHERE short_code = ?',
-        [shortCode],
-        { prepare: true }
-      );
-      
-      await client.execute(
-        'DELETE FROM url_clicks WHERE short_code = ?',
-        [shortCode],
-        { prepare: true }
-      );
-      
+    if (this.isExpired(url.expires_at)) {
+      await this.remove(shortCode);
       throw new NotFoundException('URL has expired');
     }
 
+    await this.setCache(shortCode, url);
     return url;
+  }
+
+  async findAll(): Promise<UrlResponseDto[]> {
+    const cachedUrls = await this.getFromCache('all');
+    if (cachedUrls) return cachedUrls;
+
+    const urls = await this.getAllUrlsFromDatabase();
+    await this.setCache('all', urls);
+    return urls;
   }
 
   async remove(shortCode: string): Promise<void> {
     const client = this.databaseService.getClient();
+    const exists = await this.urlExists(shortCode);
 
-    const checkResult = await client.execute(
-      'SELECT short_code FROM urls WHERE short_code = ?',
-      [shortCode],
-      { prepare: true }
-    );
-
-    if (checkResult.rowLength === 0) {
+    if (!exists) {
       throw new NotFoundException('URL not found');
     }
 
+    await Promise.all([
+      client.execute('DELETE FROM urls WHERE short_code = ?', [shortCode], {
+        prepare: true,
+      }),
+      client.execute(
+        'DELETE FROM url_clicks WHERE short_code = ?',
+        [shortCode],
+        { prepare: true },
+      ),
+      this.invalidateCache(shortCode),
+      this.invalidateCache('all'),
+    ]);
+  }
+
+  async incrementClicks(shortCode: string): Promise<void> {
+    const client = this.databaseService.getClient();
     await client.execute(
-      'DELETE FROM urls WHERE short_code = ?',
+      'UPDATE url_clicks SET clicks = clicks + 1 WHERE short_code = ?',
       [shortCode],
-      { prepare: true }
+      { prepare: true },
     );
 
-    await client.execute(
-      'DELETE FROM url_clicks WHERE short_code = ?',
-      [shortCode],
-      { prepare: true }
-    );
+    await this.updateClicksInCache(shortCode);
+  }
 
-    // Invalidate both specific and list cache
-    await this.redisService.del(this.getRedisKey(shortCode));
-    await this.redisService.del(this.getRedisKey('all'));
+  private async getFromCache(key: string): Promise<any> {
+    const cached = await this.redisService.get(this.getRedisKey(key));
+    return cached ? JSON.parse(cached) : null;
+  }
+
+  private async setCache(key: string, value: any): Promise<void> {
+    await this.redisService.set(
+      this.getRedisKey(key),
+      JSON.stringify(value),
+      this.redisTTL,
+    );
+  }
+
+  private async invalidateCache(key: string): Promise<void> {
+    await this.redisService.del(this.getRedisKey(key));
+  }
+
+  private async updateClicksInCache(shortCode: string): Promise<void> {
+    const cached = await this.getFromCache(shortCode);
+    if (cached) {
+      cached.clicks += 1;
+      await this.setCache(shortCode, cached);
+    }
+  }
+
+  private createUrlResponse(
+    shortCode: string,
+    originalUrl: string,
+    createdAt: Date,
+    expiresAt: Date | null,
+    clicks: number,
+  ): UrlResponseDto {
+    return new UrlResponseDto({
+      shortCode,
+      originalUrl,
+      createdAt,
+      expiresAt,
+      clicks,
+      newUrl: `${this.configService.get('BASE_URL')}/${shortCode}`,
+    });
+  }
+
+  private isExpired(expiresAt: Date | null): boolean {
+    return expiresAt ? new Date() > expiresAt : false;
+  }
+
+  private async urlExists(shortCode: string): Promise<boolean> {
+    const client = this.databaseService.getClient();
+    const result = await client.execute(
+      'SELECT short_code FROM urls WHERE short_code = ?',
+      [shortCode],
+      { prepare: true },
+    );
+    return result.rowLength > 0;
   }
 
   private async generateUniqueShortCode(): Promise<string> {
@@ -153,19 +196,11 @@ export class UrlsService {
     do {
       shortCode = this.generateShortCode();
       const result = await client.execute(
-        'INSERT INTO urls (short_code) VALUES (?) IF NOT EXISTS',
+        'SELECT short_code FROM urls WHERE short_code = ?',
         [shortCode],
         { prepare: true },
       );
-      exists = !result.first().get('[applied]');
-
-      if (exists) {
-        await client.execute(
-          'DELETE FROM urls WHERE short_code = ?',
-          [shortCode],
-          { prepare: true },
-        );
-      }
+      exists = result.rowLength > 0;
     } while (exists);
 
     return shortCode;
@@ -179,134 +214,56 @@ export class UrlsService {
     ).join('');
   }
 
-  async findAll(): Promise<UrlResponseDto[]> {
-    const redisKey = this.getRedisKey('all');
-    
-    // Try to get from cache first
-    const cachedUrls = await this.redisService.get(redisKey);
-    if (cachedUrls) {
-      return JSON.parse(cachedUrls);
-    }
-
-    // If not in cache, get from database
+  private async getUrlFromDatabase(shortCode: string): Promise<IUrl | null> {
     const client = this.databaseService.getClient();
-    const query = 'SELECT * FROM urls';
-    const result = await client.execute(query, [], { prepare: true });
-    
+    const [urlResult, clicksResult] = await Promise.all([
+      client.execute('SELECT * FROM urls WHERE short_code = ?', [shortCode], {
+        prepare: true,
+      }),
+      client.execute(
+        'SELECT clicks FROM url_clicks WHERE short_code = ?',
+        [shortCode],
+        { prepare: true },
+      ),
+    ]);
+
+    if (!urlResult.rows.length) return null;
+
+    const url = urlResult.first();
+    return {
+      short_code: url.short_code,
+      original_url: url.original_url,
+      created_at: url.created_at,
+      expires_at: url.expires_at,
+      clicks: clicksResult.first()?.clicks || 0,
+      new_url: `${this.configService.get('BASE_URL')}/${url.short_code}`,
+    };
+  }
+
+  private async getAllUrlsFromDatabase(): Promise<UrlResponseDto[]> {
+    const client = this.databaseService.getClient();
+    const result = await client.execute('SELECT * FROM urls', [], {
+      prepare: true,
+    });
+
     const urls = await Promise.all(
       result.rows.map(async (row) => {
         const clicksResult = await client.execute(
           'SELECT clicks FROM url_clicks WHERE short_code = ?',
           [row.short_code],
-          { prepare: true }
+          { prepare: true },
         );
-        return {
-          short_code: row.short_code,
-          original_url: row.original_url,
-          created_at: row.created_at,
-          expires_at: row.expires_at,
-          clicks: clicksResult.first()?.clicks || 0
-        } as IUrl;
+
+        return this.createUrlResponse(
+          row.short_code,
+          row.original_url,
+          row.created_at,
+          row.expires_at,
+          clicksResult.first()?.clicks || 0,
+        );
       }),
     );
 
-    const response = urls.map(url => new UrlResponseDto({
-      shortCode: url.short_code,
-      originalUrl: url.original_url,
-      createdAt: url.created_at,
-      expiresAt: url.expires_at,
-      clicks: url.clicks,
-      newUrl: `${this.configService.get('BASE_URL')}/${url.short_code}`,
-    }));
-
-    // Store in cache
-    await this.redisService.set(redisKey, JSON.stringify(response), this.redisTTL);
-    return response;
-  }
-
-  async findOne(shortCode: string): Promise<UrlResponseDto> {
-    const redisKey = this.getRedisKey(shortCode);
-    
-    // Try to get from cache first
-    const cachedUrl = await this.redisService.get(redisKey);
-    if (cachedUrl) {
-      return JSON.parse(cachedUrl);
-    }
-
-    const url = await this.findByShortCode(shortCode);
-    const response = new UrlResponseDto({
-      shortCode: url.short_code,
-      originalUrl: url.original_url,
-      createdAt: url.created_at,
-      expiresAt: url.expires_at,
-      clicks: url.clicks,
-      newUrl: `${this.configService.get('BASE_URL')}/${url.short_code}`,
-    });
-
-    // Store in cache
-    await this.redisService.set(redisKey, JSON.stringify(response), this.redisTTL);
-    return response;
-  }
-
-  async update(shortCode: string, updateUrlDto: CreateUrlDto): Promise<UrlResponseDto> {
-    const url = await this.findByShortCode(shortCode);
-    const now = new Date();
-    const expiresAt = updateUrlDto.expiresAt;
-
-    const client = this.databaseService.getClient();
-    await client.execute(
-      `
-      UPDATE urls SET
-        original_url = ?,
-        created_at = ?,
-        expires_at = ?
-      WHERE short_code = ?
-      `,
-      [updateUrlDto.originalUrl, now, expiresAt, shortCode],
-      { prepare: true }
-    );
-
-    await client.execute(
-      `UPDATE url_clicks SET clicks = clicks + 0 WHERE short_code = ?`,
-      [shortCode],
-      { prepare: true }
-    );
-
-    // Invalidate both specific and list cache
-    await this.redisService.del(this.getRedisKey(shortCode));
-    await this.redisService.del(this.getRedisKey('all'));
-
-    return new UrlResponseDto({
-      shortCode,
-      originalUrl: updateUrlDto.originalUrl,
-      createdAt: now,
-      expiresAt: expiresAt,
-      clicks: 0,
-      newUrl: `${this.configService.get('BASE_URL')}/${shortCode}`,
-    });
-  }
-
-  async incrementClicks(shortCode: string): Promise<void> {
-    const url = await this.findByShortCode(shortCode);
-    if (!url) {
-      throw new NotFoundException('URL not found');
-    }
-
-    url.clicks += 1;
-    const client = this.databaseService.getClient();
-    await client.execute(
-      `UPDATE url_clicks SET clicks = clicks + 1 WHERE short_code = ?`,
-      [shortCode],
-      { prepare: true }
-    );
-
-    // Cập nhật cache nếu có
-    const redisKey = this.getRedisKey(shortCode);
-    const cachedUrl = await this.redisService.get(redisKey);
-    if (cachedUrl) {
-      const urlData = JSON.parse(cachedUrl);
-      urlData.clicks += 1;
-      await this.redisService.set(redisKey, JSON.stringify(urlData), this.redisTTL);
-    }
+    return urls;
   }
 }

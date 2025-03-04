@@ -37,10 +37,10 @@ export class UrlsController {
   @Get(':shortCode')
   @ApiOperation({ summary: 'Get URL details by short code' })
   @ApiResponse({ status: 200, type: UrlResponseDto })
-  @ApiResponse({ status: 404, description: 'URL not found' })
+  @ApiResponse({ status: 404, description: 'URL not found or expired' })
   async findOne(@Param('shortCode') shortCode: string): Promise<IUrl> {
     const url = await this.urlsService.findByShortCode(shortCode);
-    
+
     if (!url) {
       throw new NotFoundException('URL not found');
     }
@@ -55,15 +55,9 @@ export class UrlsController {
   @Delete(':shortCode')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete URL by short code' })
-  @ApiResponse({ status: HttpStatus.NO_CONTENT, description: 'URL deleted successfully' })
+  @ApiResponse({ status: HttpStatus.NO_CONTENT })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'URL not found' })
   async remove(@Param('shortCode') shortCode: string): Promise<void> {
-    const url = await this.urlsService.findByShortCode(shortCode);
-    
-    if (!url) {
-      throw new NotFoundException('URL not found');
-    }
-
     await this.urlsService.remove(shortCode);
   }
 }
