@@ -84,8 +84,3 @@ kubectl apply -f k8s/
 - **NestJS API**: Horizontal Pod Autoscaler (HPA)
 - **ScyllaDB**: StatefulSet for high availability
 - **Kafka**: Multi-broker setup for fault tolerance
-
-## Future Enhancements
-- Implement **GraphQL API** for better flexibility.
-- Add **AI-based spam detection** using machine learning.
-- Integrate **multi-region replication** for global performance.
