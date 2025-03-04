@@ -1,26 +1,22 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsUrl, IsOptional, IsISO8601 } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { IsUrl, IsOptional, IsDate } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateUrlDto {
   @ApiProperty({
-    example: 'https://example.com',
-    description: 'The URL to be shortened',
+    description: 'Original URL to shorten',
+    example: 'https://example.com/very-long-url'
   })
-  @IsUrl({
-    protocols: ['http', 'https'],
-    require_protocol: true,
-  })
-  @Transform(({ value }) => value.trim())
+  @IsUrl()
   originalUrl: string;
 
   @ApiProperty({
-    example: '2024-04-04T12:00:00Z',
-    description: 'Optional expiration date',
+    description: 'Expiration date for the URL',
     required: false,
+    example: '2025-03-04T00:00:00.000Z'
   })
   @IsOptional()
-  @IsISO8601()
-  @Transform(({ value }) => (value ? new Date(value) : null))
+  @Type(() => Date)
+  @IsDate()
   expiresAt?: Date;
 }

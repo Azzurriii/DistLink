@@ -34,4 +34,20 @@ export class RedisService implements OnModuleInit {
       this.logger.log('Disconnected from Redis');
     }
   }
+
+  async set(key: string, value: string, ttl?: number) {
+    await this.client.set(key, value, 'EX', ttl);
+  }
+
+  async get(key: string) {
+    return await this.client.get(key);
+  }
+
+  async del(key: string) {
+    await this.client.del(key);
+  }
+
+  async expire(key: string, ttl: number) {
+    await this.client.expire(key, ttl);
+  }
 }

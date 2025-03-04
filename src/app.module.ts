@@ -9,6 +9,7 @@ import { validate } from './configs/validation';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { UrlsModule } from './modules/urls/urls.module';
+import { RedisModule } from './modules/redis/redis.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { UrlsModule } from './modules/urls/urls.module';
       cache: true,
     }),
     UrlsModule,
+    RedisModule,
   ],
   controllers: [AppController],
   providers: [
