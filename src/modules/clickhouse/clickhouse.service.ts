@@ -11,7 +11,7 @@ export class ClickHouseService implements OnModuleInit {
 
   async onModuleInit() {
     const clickhouseConfig = this.configService.get('clickhouse');
-    
+
     // First connect without database
     this.client = createClient({
       url: `http://${clickhouseConfig.host}:${clickhouseConfig.port}`,
@@ -22,10 +22,10 @@ export class ClickHouseService implements OnModuleInit {
     try {
       await this.client.ping();
       this.logger.log('✅ Connected to ClickHouse!');
-      
+
       // Create database
       await this.createDatabase();
-      
+
       // Reconnect with database
       this.client = createClient({
         url: `http://${clickhouseConfig.host}:${clickhouseConfig.port}`,
@@ -45,7 +45,7 @@ export class ClickHouseService implements OnModuleInit {
   private async createDatabase() {
     const database = this.configService.get('clickhouse.database');
     await this.client.exec({
-      query: `CREATE DATABASE IF NOT EXISTS ${database}`
+      query: `CREATE DATABASE IF NOT EXISTS ${database}`,
     });
     this.logger.log('✅ Created/Verified ClickHouse Database');
   }
@@ -61,7 +61,7 @@ export class ClickHouseService implements OnModuleInit {
           referrer String
         ) ENGINE = MergeTree()
         ORDER BY (short_code, click_time)
-      `
+      `,
     });
     this.logger.log('✅ Created/Verified ClickHouse Tables');
   }
@@ -72,4 +72,4 @@ export class ClickHouseService implements OnModuleInit {
       this.logger.log('Disconnected from ClickHouse');
     }
   }
-} 
+}

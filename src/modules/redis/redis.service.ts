@@ -11,7 +11,7 @@ export class RedisService implements OnModuleInit {
 
   async onModuleInit() {
     const redisConfig = this.configService.get('redis');
-    
+
     this.client = new Redis({
       host: redisConfig.host,
       port: redisConfig.port,
@@ -34,4 +34,4 @@ export class RedisService implements OnModuleInit {
       this.logger.log('Disconnected from Redis');
     }
   }
-} 
+}

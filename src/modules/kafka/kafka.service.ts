@@ -11,7 +11,7 @@ export class KafkaService implements OnModuleInit {
 
   async onModuleInit() {
     const kafkaConfig = this.configService.get('kafka');
-    
+
     this.client = new Kafka({
       clientId: kafkaConfig.clientId,
       brokers: kafkaConfig.brokers,
@@ -22,7 +22,7 @@ export class KafkaService implements OnModuleInit {
       await admin.connect();
       await admin.listTopics();
       this.logger.log('✅ Connected to Kafka!');
-      
+
       // Create topics if they don't exist
       await this.createTopics();
       await admin.disconnect();
@@ -35,15 +35,15 @@ export class KafkaService implements OnModuleInit {
   private async createTopics() {
     const admin = this.client.admin();
     const topics = Object.values(this.configService.get('kafka.topics'));
-    
+
     await admin.createTopics({
-      topics: topics.map(topic => ({
+      topics: topics.map((topic) => ({
         topic: topic as string,
         numPartitions: 1,
         replicationFactor: 1,
       })),
     });
-    
+
     this.logger.log('✅ Created/Verified Kafka Topics');
   }
 
@@ -54,4 +54,4 @@ export class KafkaService implements OnModuleInit {
       this.logger.log('Disconnected from Kafka');
     }
   }
-} 
+}

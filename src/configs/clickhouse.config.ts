@@ -8,4 +8,4 @@ export default registerAs('clickhouse', () => ({
   password: process.env.CLICKHOUSE_PASSWORD || '',
   compression: true,
   timeout: 30000,
-})); 
+}));

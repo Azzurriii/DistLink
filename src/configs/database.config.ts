@@ -12,4 +12,4 @@ export default registerAs('database', () => ({
     retries: 3,
     delay: 1000,
   },
-})); 
+}));

@@ -7,4 +7,4 @@ export default registerAs('redis', () => ({
   db: parseInt(process.env.REDIS_DB, 10) || 0,
   ttl: parseInt(process.env.REDIS_TTL, 10) || 3600, // 1 hour
   keyPrefix: 'distlink:',
-})); 
+}));

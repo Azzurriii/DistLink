@@ -12,4 +12,4 @@ export default registerAs('kafka', () => ({
     initialRetryTime: 100,
     retries: 8,
   },
-})); 
+}));

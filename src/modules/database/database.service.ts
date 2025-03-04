@@ -11,26 +11,22 @@ export class DatabaseService implements OnModuleInit {
 
   async onModuleInit() {
     const dbConfig = this.configService.get('database');
-    
+
     this.client = new Client({
       contactPoints: [`${dbConfig.host}:${dbConfig.port}`],
       localDataCenter: dbConfig.localDataCenter,
-      credentials: { 
-        username: dbConfig.username, 
-        password: dbConfig.password 
+      credentials: {
+        username: dbConfig.username,
+        password: dbConfig.password,
       },
-      keyspace: dbConfig.keyspace,
     });
 
     try {
       await this.client.connect();
       this.logger.log('✅ Connected to ScyllaDB!');
-      
-      // Create keyspace if not exists
+
+      // Create keyspace
       await this.createKeyspace();
-      
-      // Create tables
-      await this.createTables();
     } catch (error) {
       this.logger.error('❌ Failed to connect to ScyllaDB:', error.message);
       throw error;
@@ -46,19 +42,39 @@ export class DatabaseService implements OnModuleInit {
         'replication_factor': 1
       }
     `);
+    await this.client.execute(`USE ${keyspace}`);
     this.logger.log('✅ Created/Verified Keyspace');
+
+    await this.initializeTables();
   }
 
-  private async createTables() {
-    await this.client.execute(`
-      CREATE TABLE IF NOT EXISTS urls (
-        short_code text PRIMARY KEY,
-        original_url text,
-        created_at timestamp,
-        expires_at timestamp
-      )
-    `);
-    this.logger.log('✅ Created/Verified Tables');
+  private async initializeTables() {
+    try {
+      await this.client.execute(`
+        CREATE TABLE IF NOT EXISTS urls (
+          short_code text PRIMARY KEY,
+          original_url text,
+          created_at timestamp,
+          expires_at timestamp
+        )
+      `);
+
+      await this.client.execute(`
+        CREATE TABLE IF NOT EXISTS url_clicks (
+          short_code text PRIMARY KEY,
+          clicks counter
+        )
+      `);
+
+      this.logger.log('✅ Created/Verified Tables');
+    } catch (error) {
+      this.logger.error('❌ Failed to create tables:', error.message);
+      throw error;
+    }
+  }
+
+  getClient(): Client {
+    return this.client;
   }
 
   async onModuleDestroy() {
@@ -67,4 +83,4 @@ export class DatabaseService implements OnModuleInit {
       this.logger.log('Disconnected from ScyllaDB');
     }
   }
-} 
+}

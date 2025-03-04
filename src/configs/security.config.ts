@@ -14,4 +14,4 @@ export default registerAs('security', () => ({
     allowedProtocols: ['http:', 'https:'],
     blacklistedDomains: [],
   },
-})); 
+}));
