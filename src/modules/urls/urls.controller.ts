@@ -13,6 +13,7 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { UrlsService } from './urls.service';
 import { CreateUrlDto } from './dto/create-url.dto';
 import { UrlResponseDto } from './dto/url-response.dto';
+import { IUrl } from './interfaces/url.interface';
 
 @ApiTags('urls')
 @Controller('urls')
@@ -26,15 +27,28 @@ export class UrlsController {
     return this.urlsService.create(createUrlDto);
   }
 
+  @Get()
+  @ApiOperation({ summary: 'Get all URLs' })
+  @ApiResponse({ status: 200, type: [UrlResponseDto] })
+  async findAll(): Promise<UrlResponseDto[]> {
+    return this.urlsService.findAll();
+  }
+
   @Get(':shortCode')
-  @ApiOperation({ summary: 'Get URL by short code' })
+  @ApiOperation({ summary: 'Get URL details by short code' })
   @ApiResponse({ status: 200, type: UrlResponseDto })
   @ApiResponse({ status: 404, description: 'URL not found' })
-  async findOne(@Param('shortCode') shortCode: string) {
+  async findOne(@Param('shortCode') shortCode: string): Promise<IUrl> {
     const url = await this.urlsService.findByShortCode(shortCode);
+    
     if (!url) {
       throw new NotFoundException('URL not found');
     }
+
+    if (url.expires_at && new Date() > url.expires_at) {
+      throw new NotFoundException('URL has expired');
+    }
+
     return url;
   }
 
@@ -44,13 +58,12 @@ export class UrlsController {
   @ApiResponse({ status: HttpStatus.NO_CONTENT, description: 'URL deleted successfully' })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'URL not found' })
   async remove(@Param('shortCode') shortCode: string): Promise<void> {
-    await this.urlsService.remove(shortCode);
-  }
+    const url = await this.urlsService.findByShortCode(shortCode);
+    
+    if (!url) {
+      throw new NotFoundException('URL not found');
+    }
 
-  @Get()
-  @ApiOperation({ summary: 'Get all URLs' })
-  @ApiResponse({ status: 200, type: [UrlResponseDto] })
-  async findAll() {
-    return this.urlsService.findAll();
+    await this.urlsService.remove(shortCode);
   }
 }

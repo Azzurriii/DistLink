@@ -285,4 +285,28 @@ export class UrlsService {
       newUrl: `${this.configService.get('BASE_URL')}/${shortCode}`,
     });
   }
+
+  async incrementClicks(shortCode: string): Promise<void> {
+    const url = await this.findByShortCode(shortCode);
+    if (!url) {
+      throw new NotFoundException('URL not found');
+    }
+
+    url.clicks += 1;
+    const client = this.databaseService.getClient();
+    await client.execute(
+      `UPDATE url_clicks SET clicks = clicks + 1 WHERE short_code = ?`,
+      [shortCode],
+      { prepare: true }
+    );
+
+    // Cập nhật cache nếu có
+    const redisKey = this.getRedisKey(shortCode);
+    const cachedUrl = await this.redisService.get(redisKey);
+    if (cachedUrl) {
+      const urlData = JSON.parse(cachedUrl);
+      urlData.clicks += 1;
+      await this.redisService.set(redisKey, JSON.stringify(urlData), this.redisTTL);
+    }
+  }
 }
