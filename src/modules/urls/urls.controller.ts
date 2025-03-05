@@ -8,12 +8,14 @@ import {
   NotFoundException,
   HttpCode,
   HttpStatus,
+  Patch,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { UrlsService } from './urls.service';
 import { CreateUrlDto } from './dto/create-url.dto';
 import { UrlResponseDto } from './dto/url-response.dto';
 import { IUrl } from './interfaces/url.interface';
+import { UpdateUrlDto } from './dto/update-url.dto';
 
 @ApiTags('urls')
 @Controller('urls')
@@ -59,5 +61,13 @@ export class UrlsController {
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'URL not found' })
   async remove(@Param('shortCode') shortCode: string): Promise<void> {
     await this.urlsService.remove(shortCode);
+  }
+
+  @Patch(':shortCode')
+  @ApiOperation({ summary: 'Update URL by short code' })
+  @ApiResponse({ status: 200, type: UrlResponseDto })
+  @ApiResponse({ status: 404, description: 'URL not found' })
+  async update(@Param('shortCode') shortCode: string, @Body() updateUrlDto: UpdateUrlDto): Promise<UrlResponseDto> {
+    return this.urlsService.update(shortCode, updateUrlDto);
   }
 }
