@@ -1,4 +1,10 @@
-import { Injectable, Logger, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  ConflictException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CreateUrlDto } from './dto/create-url.dto';
 import { UrlResponseDto } from './dto/url-response.dto';
@@ -32,19 +38,22 @@ export class UrlsService {
 
   private calculateExpirationDate(expiration: ExpirationOption): Date | null {
     if (expiration === ExpirationOption.FOREVER) return null;
-    
+
     const now = new Date();
-    const days = {
-      [ExpirationOption.ONE_DAY]: 1,
-      [ExpirationOption.SEVEN_DAYS]: 7,
-      [ExpirationOption.THIRTY_DAYS]: 30,
-    }[expiration] || 0;
-    
+    const days =
+      {
+        [ExpirationOption.ONE_DAY]: 1,
+        [ExpirationOption.SEVEN_DAYS]: 7,
+        [ExpirationOption.THIRTY_DAYS]: 30,
+      }[expiration] || 0;
+
     return new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
   }
 
   private async initializeCodePool(): Promise<void> {
-    this.codePool.push(...await ShortCodeGenerator.generateBatch(UrlsService.BATCH_SIZE));
+    this.codePool.push(
+      ...(await ShortCodeGenerator.generateBatch(UrlsService.BATCH_SIZE)),
+    );
   }
 
   private async getNextCode(): Promise<string> {
@@ -58,7 +67,7 @@ export class UrlsService {
     const client = this.databaseService.getClient();
     const now = new Date();
     const expiresAt = this.calculateExpirationDate(dto.expiration);
-    
+
     for (let attempt = 0; attempt < UrlsService.RETRY_ATTEMPTS; attempt++) {
       const shortCode = await this.getNextCode();
       try {
@@ -70,7 +79,7 @@ export class UrlsService {
           createdAt: now,
           expiresAt,
           clicks: 0,
-          newUrl: this.generateNewUrl(shortCode)
+          newUrl: this.generateNewUrl(shortCode),
         });
       } catch (error) {
         this.logger.error(`Attempt ${attempt + 1} failed: ${error.message}`);
@@ -85,16 +94,14 @@ export class UrlsService {
 
     const client = this.databaseService.getClient();
     const [urlResult, clicksResult] = await Promise.all([
-      client.execute(
-        'SELECT * FROM urls WHERE short_code = ?',
-        [shortCode],
-        { prepare: true }
-      ),
+      client.execute('SELECT * FROM urls WHERE short_code = ?', [shortCode], {
+        prepare: true,
+      }),
       client.execute(
         'SELECT clicks FROM url_clicks WHERE short_code = ?',
         [shortCode],
-        { prepare: true }
-      )
+        { prepare: true },
+      ),
     ]);
 
     if (!urlResult.rows.length) {
@@ -113,7 +120,7 @@ export class UrlsService {
       created_at: url.created_at,
       expires_at: url.expires_at,
       clicks: clicksResult.first()?.clicks || 0,
-      new_url: `${this.baseUrl}${url.short_code}`
+      new_url: `${this.baseUrl}${url.short_code}`,
     };
 
     await this.setCache(shortCode, urlData);
@@ -127,21 +134,24 @@ export class UrlsService {
     const client = this.databaseService.getClient();
     const [urlsResult, clicksResult] = await Promise.all([
       client.execute('SELECT * FROM urls', [], { prepare: true }),
-      client.execute('SELECT * FROM url_clicks', [], { prepare: true })
+      client.execute('SELECT * FROM url_clicks', [], { prepare: true }),
     ]);
-    
+
     const clicksMap = new Map(
-      clicksResult.rows.map(row => [row.short_code, row.clicks || 0])
+      clicksResult.rows.map((row) => [row.short_code, row.clicks || 0]),
     );
 
-    const urls = urlsResult.rows.map(row => new UrlResponseDto({
-      shortCode: row.short_code,
-      originalUrl: row.original_url,
-      createdAt: row.created_at,
-      expiresAt: row.expires_at,
-      clicks: clicksMap.get(row.short_code) || 0,
-      newUrl: this.generateNewUrl(row.short_code)
-    }));
+    const urls = urlsResult.rows.map(
+      (row) =>
+        new UrlResponseDto({
+          shortCode: row.short_code,
+          originalUrl: row.original_url,
+          createdAt: row.created_at,
+          expiresAt: row.expires_at,
+          clicks: clicksMap.get(row.short_code) || 0,
+          newUrl: this.generateNewUrl(row.short_code),
+        }),
+    );
 
     await this.setCache('all', urls);
     return urls;
@@ -150,10 +160,16 @@ export class UrlsService {
   async remove(shortCode: string): Promise<void> {
     const client = this.databaseService.getClient();
     await Promise.all([
-      client.execute('DELETE FROM urls WHERE short_code = ?', [shortCode], { prepare: true }),
-      client.execute('DELETE FROM url_clicks WHERE short_code = ?', [shortCode], { prepare: true }),
+      client.execute('DELETE FROM urls WHERE short_code = ?', [shortCode], {
+        prepare: true,
+      }),
+      client.execute(
+        'DELETE FROM url_clicks WHERE short_code = ?',
+        [shortCode],
+        { prepare: true },
+      ),
       this.redisService.del(this.getRedisKey(shortCode)),
-      this.redisService.del(this.getRedisKey('all'))
+      this.redisService.del(this.getRedisKey('all')),
     ]);
   }
 
@@ -162,50 +178,70 @@ export class UrlsService {
     await client.execute(
       'UPDATE url_clicks SET clicks = clicks + 1 WHERE short_code = ?',
       [shortCode],
-      { prepare: true }
+      { prepare: true },
     );
     await this.updateClicksInCache(shortCode);
   }
 
-  async update(shortCode: string, updateUrlDto: UpdateUrlDto): Promise<UrlResponseDto> {
-    const client = this.databaseService.getClient();
-    const { newCode, expiration } = updateUrlDto;
+  async update(
+    shortCode: string,
+    updateUrlDto: UpdateUrlDto,
+  ): Promise<UrlResponseDto> {
+    try {
+      const client = this.databaseService.getClient();
+      const { newCode, expiration } = updateUrlDto;
 
-    const oldUrl = await this.findByShortCode(shortCode);
-    if (!oldUrl) {
-      throw new NotFoundException('URL not found');
+      // Validate and find old URL
+      const oldUrl = await this.findByShortCode(shortCode);
+      if (!oldUrl) {
+        throw new NotFoundException('URL not found');
+      }
+
+      // Check if newCode already exists
+      const existingUrl = await client.execute(
+        'SELECT short_code FROM urls WHERE short_code = ?',
+        [newCode],
+        { prepare: true },
+      );
+
+      if (existingUrl.rows.length > 0) {
+        throw new ConflictException('This custom short code is already taken');
+      }
+
+      // Perform update in transaction
+      await this.createUrlRecord(
+        newCode,
+        oldUrl.original_url,
+        oldUrl.created_at,
+        expiration
+          ? this.calculateExpirationDate(expiration)
+          : oldUrl.expires_at,
+      );
+
+      await Promise.all([
+        this.remove(shortCode),
+        this.invalidateMultipleKeys(['all']),
+      ]);
+
+      // Return response
+      return new UrlResponseDto({
+        shortCode: newCode,
+        originalUrl: oldUrl.original_url,
+        createdAt: oldUrl.created_at,
+        expiresAt: oldUrl.expires_at,
+        clicks: oldUrl.clicks,
+        newUrl: this.generateNewUrl(newCode),
+      });
+    } catch (error) {
+      this.logger.error(`Failed to update URL: ${error.message}`);
+      if (
+        error instanceof NotFoundException ||
+        error instanceof ConflictException
+      ) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Failed to update URL');
     }
-
-    const existingUrl = await client.execute(
-      'SELECT short_code FROM urls WHERE short_code = ?',
-      [newCode],
-      { prepare: true }
-    );
-    
-    if (existingUrl.rows.length > 0) {
-      throw new ConflictException('This custom short code is already taken');
-    }
-
-    await this.createUrlRecord(
-      newCode, 
-      oldUrl.original_url,
-      oldUrl.created_at,
-      expiration ? this.calculateExpirationDate(expiration) : oldUrl.expires_at
-    );
-
-    await Promise.all([
-      this.remove(shortCode),
-      this.invalidateMultipleKeys(['all'])
-    ]);
-
-    return new UrlResponseDto({
-      shortCode: newCode,
-      originalUrl: oldUrl.original_url,
-      createdAt: oldUrl.created_at,
-      expiresAt: oldUrl.expires_at,
-      clicks: oldUrl.clicks,
-      newUrl: this.generateNewUrl(newCode)
-    });
   }
 
   private async getFromCache(key: string): Promise<any> {
@@ -217,7 +253,7 @@ export class UrlsService {
     await this.redisService.set(
       this.getRedisKey(key),
       JSON.stringify(value),
-      this.configService.get('redis.ttl')
+      this.configService.get('redis.ttl'),
     );
   }
 
@@ -239,23 +275,28 @@ export class UrlsService {
 
   private async invalidateMultipleKeys(keys: string[]): Promise<void> {
     await Promise.all(
-      keys.map(key => this.redisService.del(this.getRedisKey(key)))
+      keys.map((key) => this.redisService.del(this.getRedisKey(key))),
     );
   }
 
-  private async createUrlRecord(shortCode: string, originalUrl: string, now: Date, expiresAt: Date | null): Promise<void> {
+  private async createUrlRecord(
+    shortCode: string,
+    originalUrl: string,
+    now: Date,
+    expiresAt: Date | null,
+  ): Promise<void> {
     const client = this.databaseService.getClient();
     await Promise.all([
       client.execute(
         'INSERT INTO urls (short_code, original_url, created_at, expires_at) VALUES (?, ?, ?, ?) IF NOT EXISTS',
         [shortCode, originalUrl, now, expiresAt],
-        { prepare: true }
+        { prepare: true },
       ),
       client.execute(
         'UPDATE url_clicks SET clicks = clicks + 0 WHERE short_code = ?',
         [shortCode],
-        { prepare: true }
-      )
+        { prepare: true },
+      ),
     ]);
   }
 }
