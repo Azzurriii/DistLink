@@ -8,6 +8,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule } from '@nestjs/config';
 import { RateLimitGuard } from '../../common/guards/rate-limit.guard';
 import { Reflector } from '@nestjs/core';
+import { KafkaModule } from '../kafka/kafka.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { Reflector } from '@nestjs/core';
     RedisModule,
     ConfigModule,
     ScheduleModule.forRoot(),
+    KafkaModule
   ],
   controllers: [UrlsController, RedirectController],
   providers: [UrlsService, RateLimitGuard, Reflector],

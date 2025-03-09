@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, Inject, forwardRef } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { PrometheusService } from '../monitoring/prometheus.service';
 import { KafkaProducerService } from '../kafka/kafka-producer.service';
@@ -36,6 +36,7 @@ export class ClickProcessorService implements OnModuleDestroy {
   constructor(
     private readonly dbService: DatabaseService,
     private readonly monitoring: PrometheusService,
+    @Inject(forwardRef(() => KafkaProducerService))
     private readonly kafkaProducer: KafkaProducerService,
   ) {
     this.startPeriodicFlush();

@@ -3,6 +3,8 @@ import {
   OnModuleInit,
   OnModuleDestroy,
   Logger,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { Kafka, Consumer } from 'kafkajs';
 import { ConfigService } from '@nestjs/config';
@@ -18,6 +20,7 @@ export class KafkaConsumerService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     private readonly configService: ConfigService,
+    @Inject(forwardRef(() => ClickProcessorService))
     private readonly clickProcessor: ClickProcessorService,
     private readonly kafkaProducer: KafkaProducerService,
     private readonly monitoring: PrometheusService,
@@ -38,13 +41,24 @@ export class KafkaConsumerService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit() {
-    try {
-      await this.consumer.connect();
-      await this.setupSubscriptions();
-      this.logger.log('Kafka Consumer connected successfully');
-    } catch (error) {
-      this.logger.error('Failed to connect Kafka Consumer', error);
-      throw error;
+    let retries = 3;
+    while (retries > 0) {
+      try {
+        await this.consumer.connect();
+        await this.setupSubscriptions();
+        this.logger.log('Kafka Consumer connected successfully');
+        return;
+      } catch (error) {
+        retries--;
+        if (retries === 0) {
+          this.logger.error('Failed to connect Kafka Consumer after multiple attempts', error);
+          this.logger.warn('Application will continue without Kafka consumer functionality');
+          return; // Không throw error để ứng dụng vẫn chạy được
+        }
+        
+        this.logger.warn(`Kafka consumer connection failed, retrying... (${retries} attempts left)`);
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
     }
   }
 
