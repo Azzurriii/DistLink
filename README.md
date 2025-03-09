@@ -182,12 +182,6 @@ The architecture prioritizes scalability, fault tolerance, and low latency.
 *   **ScyllaDB:**  Use a StatefulSet to manage ScyllaDB for high availability and data persistence.  Ensure proper replication and data distribution across nodes.
 *   **Kafka:**  Deploy Kafka in a multi-broker setup for fault tolerance.  Configure topic replication to ensure data durability.
 
-## Monitoring and Logging
-
-*   **Metrics:**  Expose metrics from each service using Prometheus.
-*   **Logging:**  Implement centralized logging using tools like Elasticsearch, Fluentd, and Kibana (EFK stack) or Grafana Loki.
-*   **Alerting:**  Set up alerting using Prometheus Alertmanager to notify you of critical issues.
-
 ## Contributing
 
 Please read `CONTRIBUTING.md` for details on our code of conduct, and the process for submitting pull requests to us.
