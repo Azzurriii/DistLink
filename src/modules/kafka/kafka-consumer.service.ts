@@ -51,13 +51,20 @@ export class KafkaConsumerService implements OnModuleInit, OnModuleDestroy {
       } catch (error) {
         retries--;
         if (retries === 0) {
-          this.logger.error('Failed to connect Kafka Consumer after multiple attempts', error);
-          this.logger.warn('Application will continue without Kafka consumer functionality');
+          this.logger.error(
+            'Failed to connect Kafka Consumer after multiple attempts',
+            error,
+          );
+          this.logger.warn(
+            'Application will continue without Kafka consumer functionality',
+          );
           return; // Không throw error để ứng dụng vẫn chạy được
         }
-        
-        this.logger.warn(`Kafka consumer connection failed, retrying... (${retries} attempts left)`);
-        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        this.logger.warn(
+          `Kafka consumer connection failed, retrying... (${retries} attempts left)`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 3000));
       }
     }
   }

@@ -1,4 +1,10 @@
-import { Injectable, Logger, OnModuleDestroy, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { PrometheusService } from '../monitoring/prometheus.service';
 import { KafkaProducerService } from '../kafka/kafka-producer.service';
@@ -280,22 +286,32 @@ export class ClickProcessorService implements OnModuleDestroy {
     }
   }
 
-  private async saveBatchToDatabase(
-    batch: ClickEvent[],
-    retries = this.MAX_RETRIES,
-  ) {
+  private async saveBatchToDatabase(batch: ClickEvent[], retries = this.MAX_RETRIES) {
     const client = this.dbService.getClient();
-    const queries = batch.map((click) => ({
-      query: 'UPDATE url_clicks SET clicks = clicks + 1 WHERE short_code = ?',
-      params: [click.shortCode],
-    }));
 
     try {
-      await client.batch(queries, { prepare: true });
+      // Group same shortCode to optimize number of queries
+      const clickCounts = new Map<string, number>();
+
+      batch.forEach(click => {
+        const count = clickCounts.get(click.shortCode) || 0;
+        clickCounts.set(click.shortCode, count + 1);
+      });
+      
+      // Perform individual queries instead of batch
+      const promises = Array.from(clickCounts.entries()).map(([shortCode, count]) => 
+        client.execute(
+          'UPDATE url_clicks SET clicks = clicks + ? WHERE short_code = ?',
+          [count, shortCode],
+          { prepare: true }
+        )
+      );
+      
+      await Promise.all(promises);
     } catch (error) {
       if (retries > 0) {
         this.logger.warn(`Retrying batch save, attempts left: ${retries - 1}`);
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 1000));
         return this.saveBatchToDatabase(batch, retries - 1);
       }
       throw error;

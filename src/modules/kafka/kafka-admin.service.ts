@@ -34,39 +34,49 @@ export class KafkaAdminService implements OnModuleInit {
         connected = true;
       } catch (error) {
         retries--;
-        this.logger.warn(`Failed to connect to Kafka, retrying... (${retries} attempts left)`);
+        this.logger.warn(
+          `Failed to connect to Kafka, retrying... (${retries} attempts left)`,
+        );
         if (retries === 0) {
-          this.logger.error('Could not connect to Kafka after multiple attempts');
+          this.logger.error(
+            'Could not connect to Kafka after multiple attempts',
+          );
           return false;
         }
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise((resolve) => setTimeout(resolve, 2000));
       }
     }
 
     try {
       const topics = this.configService.get('kafka.topics');
-      const topicList = [topics.urlClicks, topics.urlAnalytics, topics.urlErrors];
-      
+      const topicList = [
+        topics.urlClicks,
+        topics.urlAnalytics,
+        topics.urlErrors,
+      ];
+
       const existingTopics = await admin.listTopics();
-      
-      const topicsToCreate = topicList.filter(topic => !existingTopics.includes(topic));
-      
+
+      const topicsToCreate = topicList.filter(
+        (topic) => !existingTopics.includes(topic),
+      );
+
       if (topicsToCreate.length > 0) {
         await admin.createTopics({
-          topics: topicsToCreate.map(topic => ({
+          topics: topicsToCreate.map((topic) => ({
             topic,
-            numPartitions: 3,         // Number of partitions
-            replicationFactor: 1,     // Replication factor (1 cho dev, nên cao hơn cho prod)
+            numPartitions: 3, // Number of partitions
+            replicationFactor: 1, // Replication factor (1 cho dev, nên cao hơn cho prod)
             configEntries: [
-              { name: 'retention.ms', value: '604800000' }  // Giữ messages 7 ngày
-            ]
-          }))
+              { name: 'retention.ms', value: '604800000' }, // Giữ messages 7 ngày
+            ],
+          })),
         });
         this.logger.log(`Created Kafka topics: ${topicsToCreate.join(', ')}`);
       } else {
         this.logger.log('All required Kafka topics already exist');
       }
-      
+
       await admin.disconnect();
       return true;
     } catch (error) {
@@ -80,4 +90,4 @@ export class KafkaAdminService implements OnModuleInit {
       return false;
     }
   }
-} 
+}

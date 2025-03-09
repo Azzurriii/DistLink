@@ -5,11 +5,7 @@ import { DatabaseModule } from '../database/database.module';
 import { KafkaModule } from '../kafka/kafka.module';
 
 @Module({
-  imports: [
-    MonitoringModule,
-    DatabaseModule,
-    forwardRef(() => KafkaModule)
-  ],
+  imports: [MonitoringModule, DatabaseModule, forwardRef(() => KafkaModule)],
   providers: [ClickProcessorService],
   exports: [ClickProcessorService],
 })

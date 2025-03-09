@@ -16,7 +16,7 @@ import { KafkaModule } from '../kafka/kafka.module';
     RedisModule,
     ConfigModule,
     ScheduleModule.forRoot(),
-    KafkaModule
+    KafkaModule,
   ],
   controllers: [UrlsController, RedirectController],
   providers: [UrlsService, RateLimitGuard, Reflector],
