@@ -4,6 +4,8 @@
 
 DistLink is a high-performance, distributed URL shortener designed to handle millions of requests per second. Built with modern technologies like NestJS, ScyllaDB, Kafka, Redis, and Kubernetes, it offers fast URL redirects, real-time analytics, and robust anti-spam protection. This project is designed for scalability, fault tolerance, and low latency, making it ideal for high-traffic applications.
 
+Frontend: [DistLink Backend](https://github.com/Azzurriii/DistLink-UI)
+
 ## Features
 
 *   **High Performance:** Optimized for millions of requests per second.
