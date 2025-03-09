@@ -1,19 +1,48 @@
-import { Controller, Get, Param, Res, NotFoundException } from '@nestjs/common';
-import { Response } from 'express';
+import { Controller, Get, Param, Req, Res } from '@nestjs/common';
 import { UrlsService } from './urls.service';
+import { KafkaProducerService } from '../kafka/kafka-producer.service';
+import { Request, Response } from 'express';
 
 @Controller()
 export class RedirectController {
-  constructor(private readonly urlsService: UrlsService) {}
+  constructor(
+    private readonly urlsService: UrlsService,
+    private readonly kafkaProducer: KafkaProducerService,
+  ) {}
 
   @Get(':shortCode')
-  async redirect(@Param('shortCode') shortCode: string, @Res() res: Response) {
+  async redirect(
+    @Param('shortCode') shortCode: string,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
     try {
       const url = await this.urlsService.findByShortCode(shortCode);
-      await this.urlsService.incrementClicks(shortCode);
-      return res.redirect(301, url.original_url);
+
+      // Emit click event asynchronously
+      this.kafkaProducer
+        .sendClickEvent(shortCode, {
+          timestamp: new Date(),
+          userAgent: req.headers['user-agent'],
+          ip: req.ip,
+          referer: req.headers.referer,
+        })
+        .catch((error) => {
+          this.kafkaProducer.sendErrorEvent({
+            code: 'CLICK_EVENT_ERROR',
+            message: error.message,
+            metadata: { shortCode },
+          });
+        });
+
+      return res.redirect(url.original_url);
     } catch (error) {
-      throw new NotFoundException('Link not found or has expired');
+      this.kafkaProducer.sendErrorEvent({
+        code: 'REDIRECT_ERROR',
+        message: error.message,
+        metadata: { shortCode },
+      });
+      throw error;
     }
   }
 }

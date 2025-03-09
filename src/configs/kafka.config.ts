@@ -5,8 +5,9 @@ export default registerAs('kafka', () => ({
   clientId: process.env.KAFKA_CLIENT_ID || 'distlink',
   groupId: process.env.KAFKA_GROUP_ID || 'distlink-group',
   topics: {
-    urlClicks: 'url-clicks',
-    urlAnalytics: 'url-analytics',
+    urlClicks: 'url.clicks',
+    urlAnalytics: 'url.analytics',
+    urlErrors: 'url.errors',
   },
   retry: {
     initialRetryTime: 100,
