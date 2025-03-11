@@ -11,14 +11,8 @@ import { Reflector } from '@nestjs/core';
 import { KafkaModule } from '../kafka/kafka.module';
 
 @Module({
-  imports: [
-    DatabaseModule,
-    RedisModule,
-    ConfigModule,
-    ScheduleModule.forRoot(),
-    KafkaModule,
-  ],
-  controllers: [UrlsController, RedirectController],
-  providers: [UrlsService, RateLimitGuard, Reflector],
+	imports: [DatabaseModule, RedisModule, ConfigModule, ScheduleModule.forRoot(), KafkaModule],
+	controllers: [UrlsController, RedirectController],
+	providers: [UrlsService, RateLimitGuard, Reflector],
 })
 export class UrlsModule {}

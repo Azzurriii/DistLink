@@ -132,7 +132,7 @@ The architecture prioritizes scalability, fault tolerance, and low latency.
 
 4.  **Access the API:**
 
-    The API will be accessible at `http://localhost:3000`.  Refer to the NestJS application's configuration for the specific port.
+    The API will be accessible at `http://localhost:8000`.  Refer to the NestJS application's configuration for the specific port.
 
 5. **Check the logs**
 ```bash

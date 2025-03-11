@@ -15,27 +15,27 @@ import { ClickProcessorService } from './modules/clicks/click-processor.service'
 import { ClicksModule } from './modules/clicks/clicks.module';
 import { MonitoringModule } from './modules/monitoring/monitoring.module';
 @Module({
-  imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-      load: configs,
-      validate,
-      cache: true,
-    }),
-    UrlsModule,
-    RedisModule,
-    KafkaModule,
-    ClicksModule,
-    MonitoringModule,
-  ],
-  controllers: [AppController],
-  providers: [
-    AppService,
-    DatabaseService,
-    RedisService,
-    KafkaProducerService,
-    ClickHouseService,
-    ClickProcessorService,
-  ],
+	imports: [
+		ConfigModule.forRoot({
+			isGlobal: true,
+			load: configs,
+			validate,
+			cache: true,
+		}),
+		UrlsModule,
+		RedisModule,
+		KafkaModule,
+		ClicksModule,
+		MonitoringModule,
+	],
+	controllers: [AppController],
+	providers: [
+		AppService,
+		DatabaseService,
+		RedisService,
+		KafkaProducerService,
+		ClickHouseService,
+		ClickProcessorService,
+	],
 })
 export class AppModule {}

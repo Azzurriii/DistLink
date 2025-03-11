@@ -7,8 +7,8 @@ import { MonitoringModule } from '../monitoring/monitoring.module';
 import { ClicksModule } from '../clicks/clicks.module';
 
 @Module({
-  imports: [ConfigModule, MonitoringModule, forwardRef(() => ClicksModule)],
-  providers: [KafkaAdminService, KafkaProducerService, KafkaConsumerService],
-  exports: [KafkaProducerService],
+	imports: [ConfigModule, MonitoringModule, forwardRef(() => ClicksModule)],
+	providers: [KafkaAdminService, KafkaProducerService, KafkaConsumerService],
+	exports: [KafkaProducerService],
 })
 export class KafkaModule {}

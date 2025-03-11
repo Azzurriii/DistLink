@@ -3,18 +3,18 @@ import { TrackingController } from './tracking.controller';
 import { TrackingService } from './tracking.service';
 
 describe('TrackingController', () => {
-  let controller: TrackingController;
+	let controller: TrackingController;
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      controllers: [TrackingController],
-      providers: [TrackingService],
-    }).compile();
+	beforeEach(async () => {
+		const module: TestingModule = await Test.createTestingModule({
+			controllers: [TrackingController],
+			providers: [TrackingService],
+		}).compile();
 
-    controller = module.get<TrackingController>(TrackingController);
-  });
+		controller = module.get<TrackingController>(TrackingController);
+	});
 
-  it('should be defined', () => {
-    expect(controller).toBeDefined();
-  });
+	it('should be defined', () => {
+		expect(controller).toBeDefined();
+	});
 });
