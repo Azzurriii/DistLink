@@ -42,7 +42,7 @@ The architecture prioritizes scalability, fault tolerance, and low latency.
     *   Provides high-throughput storage for URL mappings, ensuring fast lookups.
     *   Uses a **partition key (short_code)** for efficient data distribution and retrieval.
     *   Implements **TTL (Time-To-Live)** to automatically expire links after a configured period, preventing database bloat.
-    *   Uses CQL for data modeling.  Consider including a brief description of the table schema (short_code, original_url, creation_date, etc.).
+    *   Uses CQL for data modeling.
 
 ### 4. Caching Layer (Performance Optimization)
 
@@ -109,7 +109,6 @@ The architecture prioritizes scalability, fault tolerance, and low latency.
 *   Docker Compose (for local development)
 *   Kubernetes cluster (for production deployment)
 *   kubectl (Kubernetes command-line tool)
-*   Helm (Optional - for managing Kubernetes packages)
 
 ### Installation
 
