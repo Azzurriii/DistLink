@@ -74,7 +74,7 @@ export class UrlsController {
 	}
 
 	@Patch(':shortCode')
-	@RateLimit({ limit: 20, window: 60 })
+	@RateLimit({ limit: 30, window: 60 })
 	@ApiOperation({ summary: 'Update URL by short code' })
 	@ApiResponse({ status: 200, type: UrlResponseDto })
 	@ApiResponse({ status: 404, description: 'URL not found' })
