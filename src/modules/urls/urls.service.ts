@@ -22,7 +22,7 @@ export class UrlsService {
 		private readonly configService: ConfigService,
 		private readonly redisService: RedisService,
 	) {
-		this.baseUrl = this.configService.get('BASE_URL');
+		this.baseUrl = this.configService.get('BASE_URL') || 'https://distl.space';
 		this.initializeCodePool();
 	}
 
