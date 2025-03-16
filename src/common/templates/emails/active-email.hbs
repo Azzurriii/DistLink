@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Confirm Your Email</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #f4f4f4;
+      font-family: 'Arial', sans-serif;
+      color: #333;
+    }
+    .email-wrapper {
+      width: 100%;
+      padding: 30px 15px;
+      background-color: #f4f4f4;
+    }
+    .email-content {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      padding: 40px 30px;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .logo {
+      max-width: 140px;
+      margin-bottom: 10px;
+    }
+    h1 {
+      color: #1A237E;
+      font-size: 24px;
+      margin: 0;
+      font-weight: 700;
+    }
+    h2 {
+      font-size: 18px;
+      font-weight: 600;
+      margin: 20px 0 10px;
+    }
+    p {
+      font-size: 15px;
+      line-height: 1.7;
+      margin: 12px 0;
+      color: #555;
+    }
+    p strong {
+      color: #1A237E;
+    }
+    p em {
+      color: #333;
+    }
+    .button {
+      display: inline-block;
+      padding: 15px 30px;
+      margin: 30px auto;
+      background-color: #1A237E;
+      color: #ffffff;
+      text-decoration: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      text-align: center;
+    }
+    .button:hover {
+      background-color: #0D155C;
+    }
+    .footer {
+      margin-top: 40px;
+      text-align: center;
+      font-size: 12px;
+      color: #999;
+    }
+    @media (max-width: 600px) {
+      .email-content {
+        padding: 20px;
+      }
+      .button {
+        width: 100%;
+        box-sizing: border-box;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="email-wrapper">
+    <div class="email-content">
+
+      <div class="header">
+        <img src="https://res.cloudinary.com/di5ey5axg/image/upload/v1742110768/shopify/xjxomejex3ffr2jnb50s.png" alt="DistLink Logo" class="logo">
+        <h1>Welcome to DistLink</h1>
+      </div>
+
+      <h2>Hello <strong>{{name}}</strong>,</h2>
+
+      <p><strong>Thank you</strong> for joining DistLink! To get started, please <em>confirm your email address</em> by clicking the button below:</p>
+
+      <p style="text-align: center;">
+        <a href="{{verificationLink}}" class="button">Confirm Email</a>
+      </p>
+
+      <p>If the button doesn't work, you can copy and paste the link below into your browser:</p>
+
+      <p style="word-break: break-word; color: #1A237E;"><strong>{{verificationLink}}</strong></p>
+
+      <p><em>This link is valid for 24 hours. If you did not sign up for DistLink, please ignore this message.</em></p>
+
+      <p>Warm regards,<br><strong>The DistLink Team</strong></p>
+
+      <div class="footer">
+        <p>This is an automated email. Please do not reply.</p>
+        <p>&copy; 2025 DistLink. All rights reserved.</p>
+      </div>
+
+    </div>
+  </div>
+</body>
+</html>

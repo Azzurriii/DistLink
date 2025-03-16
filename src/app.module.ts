@@ -14,6 +14,8 @@ import { KafkaModule } from './modules/kafka/kafka.module';
 import { ClickProcessorService } from './modules/clicks/click-processor.service';
 import { ClicksModule } from './modules/clicks/clicks.module';
 import { MonitoringModule } from './modules/monitoring/monitoring.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { UsersModule } from './modules/users/users.module';
 @Module({
 	imports: [
 		ConfigModule.forRoot({
@@ -27,6 +29,8 @@ import { MonitoringModule } from './modules/monitoring/monitoring.module';
 		KafkaModule,
 		ClicksModule,
 		MonitoringModule,
+		AuthModule,
+		UsersModule,
 	],
 	controllers: [AppController],
 	providers: [

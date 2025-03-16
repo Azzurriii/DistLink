@@ -51,21 +51,37 @@ export class DatabaseService implements OnModuleInit {
 	private async initializeTables() {
 		try {
 			await this.client.execute(`
-        CREATE TABLE IF NOT EXISTS urls (
-          short_code text PRIMARY KEY,
-          original_url text,
-          created_at timestamp,
-          expires_at timestamp
-        )
-      `);
+				CREATE TABLE IF NOT EXISTS urls (
+					short_code text PRIMARY KEY,
+					original_url text,
+					created_at timestamp,
+					expires_at timestamp
+				)
+      		`);
 
 			await this.client.execute(`
-        CREATE TABLE IF NOT EXISTS url_clicks (
-          short_code text PRIMARY KEY,
-          clicks counter
-        )
-      `);
+				CREATE TABLE IF NOT EXISTS url_clicks (
+					short_code text PRIMARY KEY,
+					clicks counter
+				)
+      		`);
 
+			await this.client.execute(`
+				CREATE TABLE IF NOT EXISTS users (
+					id uuid PRIMARY KEY,
+					email text,
+					password text,
+					full_name text,
+					is_active boolean,
+					created_at timestamp,
+					updated_at timestamp
+				)
+      		`);
+			
+			await this.client.execute(`
+				CREATE INDEX IF NOT EXISTS users_email_idx ON users (email)
+			`);
+			
 			this.logger.log('✅ Created/Verified Tables');
 		} catch (error) {
 			this.logger.error('❌ Failed to create tables:', error.message);
