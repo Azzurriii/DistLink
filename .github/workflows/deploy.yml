@@ -28,8 +28,10 @@ jobs:
             -e NODE_ENV=${{ secrets.NODE_ENV }} \
             -e SCYLLA_HOST=${{ secrets.SCYLLA_HOST }} \
             -e REDIS_HOST=${{ secrets.REDIS_HOST }} \
+            -e REDIS_PORT=${{ secrets.REDIS_PORT }} \
             -e KAFKA_BROKERS=${{ secrets.KAFKA_BROKERS }} \
             -e CLICKHOUSE_HOST=${{ secrets.CLICKHOUSE_HOST }} \
+            -e CLICKHOUSE_PORT=${{ secrets.CLICKHOUSE_PORT }} \
             -e SCYLLA_PORT=${{ secrets.SCYLLA_PORT }} \
             -e SCYLLA_USERNAME=${{ secrets.SCYLLA_USERNAME }} \
             -e SCYLLA_PASSWORD=${{ secrets.SCYLLA_PASSWORD }} \
