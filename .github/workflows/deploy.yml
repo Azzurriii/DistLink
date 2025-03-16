@@ -1,0 +1,41 @@
+name: Deploy Distlink App
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: self-hosted  # Run on self-hosted runner
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy App
+        run: |
+          # Move to project directory
+          cd ~/distlink
+
+          # Update source code
+          git pull origin main
+
+          # Stop and remove old application container (if exists)
+          docker stop distlink-app || true
+          docker rm distlink-app || true
+
+          # Build and run new application
+          docker build -t dist-link:latest .
+          docker run -d --name distlink-app \
+            --network distlink-network \
+            -p 8000:8000 \
+            -e NODE_ENV=${{ secrets.NODE_ENV }} \
+            -e SCYLLA_HOST=${{ secrets.SCYLLA_HOST }} \
+            -e REDIS_HOST=${{ secrets.REDIS_HOST }} \
+            -e KAFKA_BROKERS=${{ secrets.KAFKA_BROKERS }} \
+            -e CLICKHOUSE_HOST=${{ secrets.CLICKHOUSE_HOST }} \
+            -e SCYLLA_PORT=${{ secrets.SCYLLA_PORT }} \
+            -e SCYLLA_USERNAME=${{ secrets.SCYLLA_USERNAME }} \
+            -e SCYLLA_PASSWORD=${{ secrets.SCYLLA_PASSWORD }} \
+            -e SCYLLA_KEYSPACE=${{ secrets.SCYLLA_KEYSPACE }} \
+            dist-link:latest
