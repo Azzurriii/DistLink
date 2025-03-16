@@ -55,19 +55,23 @@ export class UrlsService {
 		return this.codePool.pop()!;
 	}
 
-	async create(dto: CreateUrlDto): Promise<UrlResponseDto> {
+	async create(dto: CreateUrlDto, userId?: string): Promise<UrlResponseDto> {
 		const client = this.databaseService.getClient();
 		const now = new Date();
 		const expiresAt = this.calculateExpirationDate(dto.expiration);
 
+		console.log('Creating URL with userId:', userId);
+
 		for (let attempt = 0; attempt < UrlsService.RETRY_ATTEMPTS; attempt++) {
 			const shortCode = await this.getNextCode();
 			try {
-				await this.createUrlRecord(shortCode, dto.originalUrl, now, expiresAt);
-				await this.invalidateMultipleKeys(['all']);
+				await this.createUrlRecord(shortCode, dto.originalUrl, userId, now, expiresAt);
+				await this.invalidateMultipleKeys(['all', userId ? `user:${userId}` : null].filter(Boolean));
+				
 				return new UrlResponseDto({
 					shortCode,
 					originalUrl: dto.originalUrl,
+					userId: userId,
 					createdAt: now,
 					expiresAt,
 					clicks: 0,
@@ -105,10 +109,11 @@ export class UrlsService {
 		const urlData = {
 			short_code: url.short_code,
 			original_url: url.original_url,
+			user_id: url.user_id,
 			created_at: url.created_at,
 			expires_at: url.expires_at,
 			clicks: clicksResult.first()?.clicks || 0,
-			new_url: `${this.baseUrl}${url.short_code}`,
+			new_url: `${this.baseUrl}/${url.short_code}`,
 		};
 
 		await this.setCache(shortCode, urlData);
@@ -132,6 +137,7 @@ export class UrlsService {
 				new UrlResponseDto({
 					shortCode: row.short_code,
 					originalUrl: row.original_url,
+					userId: row.user_id,
 					createdAt: row.created_at,
 					expiresAt: row.expires_at,
 					clicks: clicksMap.get(row.short_code) || 0,
@@ -143,16 +149,61 @@ export class UrlsService {
 		return urls;
 	}
 
+	async findByUserId(userId: string): Promise<UrlResponseDto[]> {
+		const cacheKey = `user:${userId}`;
+		const cached = await this.getFromCache(cacheKey);
+		if (cached) return cached;
+
+		const client = this.databaseService.getClient();
+		const [urlsResult, clicksResult] = await Promise.all([
+			client.execute('SELECT * FROM urls WHERE user_id = ? ALLOW FILTERING', [userId], { prepare: true }),
+			client.execute('SELECT * FROM url_clicks', [], { prepare: true }),
+		]);
+
+		const clicksMap = new Map(clicksResult.rows.map((row) => [row.short_code, row.clicks || 0]));
+
+		const urls = urlsResult.rows.map(
+			(row) =>
+				new UrlResponseDto({
+					shortCode: row.short_code,
+					originalUrl: row.original_url,
+					userId: row.user_id,
+					createdAt: row.created_at,
+					expiresAt: row.expires_at,
+					clicks: clicksMap.get(row.short_code) || 0,
+					newUrl: this.generateNewUrl(row.short_code),
+				}),
+		);
+
+		await this.setCache(cacheKey, urls);
+		return urls;
+	}
+
 	async remove(shortCode: string): Promise<void> {
 		const client = this.databaseService.getClient();
-		await Promise.all([
-			client.execute('DELETE FROM urls WHERE short_code = ?', [shortCode], {
+		
+		try {
+			const urlResult = await client.execute('SELECT user_id FROM urls WHERE short_code = ?', [shortCode], {
 				prepare: true,
-			}),
-			client.execute('DELETE FROM url_clicks WHERE short_code = ?', [shortCode], { prepare: true }),
-			this.redisService.del(this.getRedisKey(shortCode)),
-			this.redisService.del(this.getRedisKey('all')),
-		]);
+			});
+			
+			if (urlResult.rows.length > 0) {
+				const userId = urlResult.first().user_id;
+				
+				await Promise.all([
+					client.execute('DELETE FROM urls WHERE short_code = ?', [shortCode], {
+						prepare: true,
+					}),
+					client.execute('DELETE FROM url_clicks WHERE short_code = ?', [shortCode], { prepare: true }),
+					this.redisService.del(this.getRedisKey(shortCode)),
+					this.redisService.del(this.getRedisKey('all')),
+					userId ? this.redisService.del(this.getRedisKey(`user:${userId}`)) : Promise.resolve(),
+				]);
+			}
+		} catch (error) {
+			this.logger.error(`Failed to remove URL: ${error.message}`);
+			throw new InternalServerErrorException('Failed to remove URL');
+		}
 	}
 
 	async incrementClicks(shortCode: string): Promise<void> {
@@ -187,16 +238,21 @@ export class UrlsService {
 			await this.createUrlRecord(
 				newCode,
 				oldUrl.original_url,
+				oldUrl.user_id,
 				oldUrl.created_at,
 				expiration ? this.calculateExpirationDate(expiration) : oldUrl.expires_at,
 			);
 
-			await Promise.all([this.remove(shortCode), this.invalidateMultipleKeys(['all'])]);
+			await Promise.all([
+				this.remove(shortCode), 
+				this.invalidateMultipleKeys(['all', oldUrl.user_id ? `user:${oldUrl.user_id}` : null].filter(Boolean))
+			]);
 
 			// Return response
 			return new UrlResponseDto({
 				shortCode: newCode,
 				originalUrl: oldUrl.original_url,
+				userId: oldUrl.user_id,
 				createdAt: oldUrl.created_at,
 				expiresAt: oldUrl.expires_at,
 				clicks: oldUrl.clicks,
@@ -243,14 +299,15 @@ export class UrlsService {
 	private async createUrlRecord(
 		shortCode: string,
 		originalUrl: string,
+		userId: string | undefined,
 		now: Date,
 		expiresAt: Date | null,
 	): Promise<void> {
 		const client = this.databaseService.getClient();
 		await Promise.all([
 			client.execute(
-				'INSERT INTO urls (short_code, original_url, created_at, expires_at) VALUES (?, ?, ?, ?) IF NOT EXISTS',
-				[shortCode, originalUrl, now, expiresAt],
+				'INSERT INTO urls (short_code, original_url, user_id, created_at, expires_at) VALUES (?, ?, ?, ?, ?) IF NOT EXISTS',
+				[shortCode, originalUrl, userId, now, expiresAt],
 				{ prepare: true },
 			),
 			client.execute('UPDATE url_clicks SET clicks = clicks + 0 WHERE short_code = ?', [shortCode], {

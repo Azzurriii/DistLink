@@ -12,8 +12,8 @@ export class AuthController {
 	@Post('login')
 	@HttpCode(HttpStatus.OK)
 	@ApiOperation({ summary: 'User login' })
-	@ApiResponse({ 
-		status: 200, 
+	@ApiResponse({
+		status: 200,
 		description: 'Login successful',
 		schema: {
 			type: 'object',
@@ -26,13 +26,13 @@ export class AuthController {
 						fullName: { type: 'string', example: 'Thanh Vo' },
 						isActive: { type: 'boolean', example: true },
 						createdAt: { type: 'string', example: '2025-03-16T14:30:00.000Z' },
-						updatedAt: { type: 'string', example: '2025-03-16T14:30:00.000Z' }
-					}
+						updatedAt: { type: 'string', example: '2025-03-16T14:30:00.000Z' },
+					},
 				},
 				accessToken: { type: 'string', example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' },
-				refreshToken: { type: 'string', example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' }
-			}
-		}
+				refreshToken: { type: 'string', example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' },
+			},
+		},
 	})
 	@ApiResponse({ status: 401, description: 'Invalid credentials' })
 	@ApiBody({
@@ -57,26 +57,26 @@ export class AuthController {
 
 	@Post('register')
 	@ApiOperation({ summary: 'User registration' })
-	@ApiResponse({ 
-		status: 201, 
+	@ApiResponse({
+		status: 201,
 		description: 'Registration successful',
 		schema: {
 			type: 'object',
 			properties: {
-				message: { 
-					type: 'string', 
-					example: 'Registration successful. Please check your email to verify your account.' 
+				message: {
+					type: 'string',
+					example: 'Registration successful. Please check your email to verify your account.',
 				},
 				user: {
 					type: 'object',
 					properties: {
 						id: { type: 'string', example: '550e8400-e29b-41d4-a716-446655440000' },
 						email: { type: 'string', example: 'tuanthanh2408qb@gmail.com' },
-						fullName: { type: 'string', example: 'Thanh Vo' }
-					}
-				}
-			}
-		}
+						fullName: { type: 'string', example: 'Thanh Vo' },
+					},
+				},
+			},
+		},
 	})
 	@ApiResponse({ status: 400, description: 'Bad request' })
 	@ApiResponse({ status: 409, description: 'User with this email already exists' })
@@ -110,16 +110,16 @@ export class AuthController {
 	@Post('refresh-token')
 	@HttpCode(HttpStatus.OK)
 	@ApiOperation({ summary: 'Refresh access token' })
-	@ApiResponse({ 
-		status: 200, 
+	@ApiResponse({
+		status: 200,
 		description: 'Token refreshed successfully',
 		schema: {
 			type: 'object',
 			properties: {
 				accessToken: { type: 'string', example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' },
-				refreshToken: { type: 'string', example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' }
-			}
-		}
+				refreshToken: { type: 'string', example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' },
+			},
+		},
 	})
 	@ApiResponse({ status: 401, description: 'Invalid refresh token' })
 	@ApiBody({
@@ -143,15 +143,15 @@ export class AuthController {
 	@ApiBearerAuth()
 	@HttpCode(HttpStatus.OK)
 	@ApiOperation({ summary: 'User logout' })
-	@ApiResponse({ 
-		status: 200, 
+	@ApiResponse({
+		status: 200,
 		description: 'Logged out successfully',
 		schema: {
 			type: 'object',
 			properties: {
-				message: { type: 'string', example: 'Logged out successfully' }
-			}
-		}
+				message: { type: 'string', example: 'Logged out successfully' },
+			},
+		},
 	})
 	@ApiResponse({ status: 401, description: 'Unauthorized' })
 	async logout(@Req() req: Request) {
@@ -161,18 +161,18 @@ export class AuthController {
 	@Post('forgot-password')
 	@HttpCode(HttpStatus.OK)
 	@ApiOperation({ summary: 'Request password reset' })
-	@ApiResponse({ 
-		status: 200, 
+	@ApiResponse({
+		status: 200,
 		description: 'Password reset email sent',
 		schema: {
 			type: 'object',
 			properties: {
-				message: { 
-					type: 'string', 
-					example: 'If your email is registered, you will receive a password reset link' 
-				}
-			}
-		}
+				message: {
+					type: 'string',
+					example: 'If your email is registered, you will receive a password reset link',
+				},
+			},
+		},
 	})
 	@ApiBody({
 		schema: {
@@ -193,15 +193,15 @@ export class AuthController {
 	@Post('reset-password')
 	@HttpCode(HttpStatus.OK)
 	@ApiOperation({ summary: 'Reset password with token' })
-	@ApiResponse({ 
-		status: 200, 
+	@ApiResponse({
+		status: 200,
 		description: 'Password reset successful',
 		schema: {
 			type: 'object',
 			properties: {
-				message: { type: 'string', example: 'Password reset successful' }
-			}
-		}
+				message: { type: 'string', example: 'Password reset successful' },
+			},
+		},
 	})
 	@ApiResponse({ status: 400, description: 'Invalid or expired token' })
 	@ApiBody({
@@ -228,8 +228,8 @@ export class AuthController {
 	@UseGuards(JwtAuthGuard)
 	@ApiBearerAuth()
 	@ApiOperation({ summary: 'Get current user profile' })
-	@ApiResponse({ 
-		status: 200, 
+	@ApiResponse({
+		status: 200,
 		description: 'User profile',
 		schema: {
 			type: 'object',
@@ -239,9 +239,9 @@ export class AuthController {
 				fullName: { type: 'string', example: 'Thanh Vo' },
 				isActive: { type: 'boolean', example: true },
 				createdAt: { type: 'string', example: '2025-03-16T14:30:00.000Z' },
-				updatedAt: { type: 'string', example: '2025-03-16T14:30:00.000Z' }
-			}
-		}
+				updatedAt: { type: 'string', example: '2025-03-16T14:30:00.000Z' },
+			},
+		},
 	})
 	@ApiResponse({ status: 401, description: 'Unauthorized' })
 	async getProfile(@Req() req: Request) {
@@ -255,17 +255,17 @@ export class AuthController {
 		name: 'token',
 		type: 'string',
 		description: 'Email verification token',
-		example: '550e8400-e29b-41d4-a716-446655440000'
+		example: '550e8400-e29b-41d4-a716-446655440000',
 	})
-	@ApiResponse({ 
-		status: 200, 
+	@ApiResponse({
+		status: 200,
 		description: 'Email verified successfully',
 		schema: {
 			type: 'object',
 			properties: {
-				message: { type: 'string', example: 'Email verified successfully. You can now log in.' }
-			}
-		}
+				message: { type: 'string', example: 'Email verified successfully. You can now log in.' },
+			},
+		},
 	})
 	@ApiResponse({ status: 400, description: 'Invalid or expired token' })
 	async verifyEmail(@Param('token') token: string) {
@@ -276,15 +276,15 @@ export class AuthController {
 	@UseGuards(JwtAuthGuard)
 	@ApiBearerAuth()
 	@ApiOperation({ summary: 'Check if token is valid' })
-	@ApiResponse({ 
-		status: 200, 
+	@ApiResponse({
+		status: 200,
 		description: 'Token is valid',
 		schema: {
 			type: 'object',
 			properties: {
-				valid: { type: 'boolean', example: true }
-			}
-		}
+				valid: { type: 'boolean', example: true },
+			},
+		},
 	})
 	@ApiResponse({ status: 401, description: 'Unauthorized' })
 	async checkToken() {
@@ -296,15 +296,15 @@ export class AuthController {
 	@ApiBearerAuth()
 	@HttpCode(HttpStatus.OK)
 	@ApiOperation({ summary: 'Change password (requires authentication)' })
-	@ApiResponse({ 
-		status: 200, 
+	@ApiResponse({
+		status: 200,
 		description: 'Password changed successfully',
 		schema: {
 			type: 'object',
 			properties: {
-				message: { type: 'string', example: 'Password changed successfully' }
-			}
-		}
+				message: { type: 'string', example: 'Password changed successfully' },
+			},
+		},
 	})
 	@ApiResponse({ status: 401, description: 'Unauthorized' })
 	@ApiResponse({ status: 400, description: 'Current password is incorrect' })
@@ -324,10 +324,7 @@ export class AuthController {
 			},
 		},
 	})
-	async changePassword(
-		@Req() req: Request,
-		@Body() body: { currentPassword: string; newPassword: string }
-	) {
+	async changePassword(@Req() req: Request, @Body() body: { currentPassword: string; newPassword: string }) {
 		return this.authService.changePassword(req.user['id'], body.currentPassword, body.newPassword);
 	}
 }

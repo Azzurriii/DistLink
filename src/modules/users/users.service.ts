@@ -106,11 +106,7 @@ export class UsersService {
 
 	async activateUser(userId: string): Promise<void> {
 		const client = this.databaseService.getClient();
-		
-		await client.execute(
-			'UPDATE users SET is_active = true WHERE id = ?',
-			[userId],
-			{ prepare: true }
-		);
+
+		await client.execute('UPDATE users SET is_active = true WHERE id = ?', [userId], { prepare: true });
 	}
 }

@@ -57,23 +57,23 @@ export class AuthService {
 
 	async register(userData: { email: string; password: string; fullName: string }) {
 		const user = await this.usersService.create(userData);
-		
+
 		// Generate verification token
 		const verificationToken = uuidv4();
-		
+
 		// Store token in Redis with expiration (24 hours)
 		await this.redisService.set(
 			`verification_token:${verificationToken}`,
 			user.id,
 			24 * 60 * 60, // 24 hours
 		);
-		
+
 		// Send verification email
 		const verificationLink = `${this.configService.get('BASE_URL')}/auth/verify-email/${verificationToken}`;
-		
+
 		// Send email with verification link
 		await this.sendVerificationEmail(user.email, user.fullName, verificationLink);
-		
+
 		return {
 			message: 'Registration successful. Please check your email to verify your account.',
 			user: {
@@ -87,17 +87,17 @@ export class AuthService {
 	async verifyEmail(token: string) {
 		// Get user ID from Redis
 		const userId = await this.redisService.get(`verification_token:${token}`);
-		
+
 		if (!userId) {
 			throw new BadRequestException('Invalid or expired verification token');
 		}
-		
+
 		// Activate user account
 		await this.usersService.activateUser(userId);
-		
+
 		// Delete token from Redis
 		await this.redisService.del(`verification_token:${token}`);
-		
+
 		return {
 			message: 'Email verified successfully. You can now log in.',
 		};
@@ -146,30 +146,30 @@ export class AuthService {
 
 	async forgotPassword(email: string) {
 		const user = await this.usersService.findByEmail(email);
-		
+
 		if (!user) {
 			// Don't reveal that the user doesn't exist
 			return {
 				message: 'If your email is registered, you will receive a password reset link',
 			};
 		}
-		
+
 		// Generate reset token
 		const resetToken = uuidv4();
-		
+
 		// Store token in Redis with expiration (1 hour)
 		await this.redisService.set(
 			`reset_token:${resetToken}`,
 			user.id,
 			3600, // 1 hour
 		);
-		
+
 		// Create reset link
 		const resetLink = `${this.configService.get('BASE_URL')}/auth/reset-password/${resetToken}`;
-		
+
 		// Send email with reset link
 		await this.sendPasswordResetEmail(user.email, user.fullName, resetLink);
-		
+
 		return {
 			message: 'If your email is registered, you will receive a password reset link',
 		};
@@ -232,20 +232,20 @@ export class AuthService {
 
 	async changePassword(userId: string, currentPassword: string, newPassword: string) {
 		const user = await this.usersService.findById(userId);
-		
+
 		if (!user) {
 			throw new UnauthorizedException('User not found');
 		}
-		
+
 		const userWithPassword = await this.usersService.findByEmail(user.email);
 		const isPasswordValid = await bcrypt.compare(currentPassword, userWithPassword.password);
-		
+
 		if (!isPasswordValid) {
 			throw new BadRequestException('Current password is incorrect');
 		}
-		
+
 		await this.usersService.updatePassword(userId, newPassword);
-		
+
 		return {
 			message: 'Password changed successfully',
 		};

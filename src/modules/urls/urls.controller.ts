@@ -11,8 +11,9 @@ import {
 	Patch,
 	BadRequestException,
 	UseGuards,
+	Request,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { UrlsService } from './urls.service';
 import { CreateUrlDto } from './dto/create-url.dto';
 import { UrlResponseDto } from './dto/url-response.dto';
@@ -20,6 +21,8 @@ import { IUrl } from './interfaces/url.interface';
 import { UpdateUrlDto } from './dto/update-url.dto';
 import { RateLimitGuard } from '../../common/guards/rate-limit.guard';
 import { RateLimit } from '../../common/decorators/rate-limit.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 
 @ApiTags('urls')
 @Controller('urls')
@@ -29,11 +32,22 @@ export class UrlsController {
 	constructor(private readonly urlsService: UrlsService) {}
 
 	@Post()
+	@UseGuards(OptionalJwtAuthGuard)
+	@ApiBearerAuth()
 	@RateLimit({ limit: 10, window: 60 })
 	@ApiOperation({ summary: 'Create a short URL' })
 	@ApiResponse({ status: 201, type: UrlResponseDto })
-	async create(@Body() createUrlDto: CreateUrlDto): Promise<UrlResponseDto> {
-		return this.urlsService.create(createUrlDto);
+	async create(@Body() createUrlDto: CreateUrlDto, @Request() req): Promise<UrlResponseDto> {
+		console.log('User from request:', req.user);
+		
+		let userId = null;
+		if (req.user && req.user.id) {
+			userId = req.user.id.toString();
+		}
+		
+		console.log('User ID extracted:', userId);
+		
+		return this.urlsService.create(createUrlDto, userId);
 	}
 
 	@Get()
@@ -42,6 +56,17 @@ export class UrlsController {
 	@ApiResponse({ status: 200, type: [UrlResponseDto] })
 	async findAll(): Promise<UrlResponseDto[]> {
 		return this.urlsService.findAll();
+	}
+
+	@Get('user')
+	@UseGuards(JwtAuthGuard)
+	@ApiBearerAuth()
+	@RateLimit({ limit: 100, window: 60 })
+	@ApiOperation({ summary: 'Get URLs by authenticated user' })
+	@ApiResponse({ status: 200, type: [UrlResponseDto] })
+	async findByUser(@Request() req): Promise<UrlResponseDto[]> {
+		const userId = req.user.id.toString();
+		return this.urlsService.findByUserId(userId);
 	}
 
 	@Get(':shortCode')
@@ -64,25 +89,49 @@ export class UrlsController {
 	}
 
 	@Delete(':shortCode')
+	@UseGuards(JwtAuthGuard)
+	@ApiBearerAuth()
 	@RateLimit({ limit: 20, window: 60 })
 	@HttpCode(HttpStatus.NO_CONTENT)
 	@ApiOperation({ summary: 'Delete URL by short code' })
 	@ApiResponse({ status: HttpStatus.NO_CONTENT })
 	@ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'URL not found' })
-	async remove(@Param('shortCode') shortCode: string): Promise<void> {
+	@ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Not authorized to delete this URL' })
+	async remove(@Param('shortCode') shortCode: string, @Request() req): Promise<void> {
+		const url = await this.urlsService.findByShortCode(shortCode);
+		const userId = req.user.id.toString();
+		
+		if (url.user_id && url.user_id !== userId) {
+			throw new BadRequestException('You are not authorized to delete this URL');
+		}
+		
 		await this.urlsService.remove(shortCode);
 	}
 
 	@Patch(':shortCode')
+	@UseGuards(JwtAuthGuard)
+	@ApiBearerAuth()
 	@RateLimit({ limit: 30, window: 60 })
 	@ApiOperation({ summary: 'Update URL by short code' })
 	@ApiResponse({ status: 200, type: UrlResponseDto })
 	@ApiResponse({ status: 404, description: 'URL not found' })
 	@ApiResponse({ status: 409, description: 'Custom code already taken' })
 	@ApiResponse({ status: 429, description: 'Too many requests' })
-	async update(@Param('shortCode') shortCode: string, @Body() updateUrlDto: UpdateUrlDto): Promise<UrlResponseDto> {
+	@ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Not authorized to update this URL' })
+	async update(
+		@Param('shortCode') shortCode: string, 
+		@Body() updateUrlDto: UpdateUrlDto,
+		@Request() req
+	): Promise<UrlResponseDto> {
 		if (!/^[a-zA-Z0-9-_]{8,16}$/.test(shortCode)) {
 			throw new BadRequestException('Invalid short code format');
+		}
+
+		const url = await this.urlsService.findByShortCode(shortCode);
+		const userId = req.user.id.toString();
+		
+		if (url.user_id && url.user_id !== userId) {
+			throw new BadRequestException('You are not authorized to update this URL');
 		}
 
 		return this.urlsService.update(shortCode, updateUrlDto);

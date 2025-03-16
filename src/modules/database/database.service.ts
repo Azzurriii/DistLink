@@ -54,10 +54,15 @@ export class DatabaseService implements OnModuleInit {
 				CREATE TABLE IF NOT EXISTS urls (
 					short_code text PRIMARY KEY,
 					original_url text,
+					user_id uuid,
 					created_at timestamp,
 					expires_at timestamp
 				)
       		`);
+
+			await this.client.execute(`
+				CREATE INDEX IF NOT EXISTS urls_user_id_idx ON urls (user_id)
+			`);
 
 			await this.client.execute(`
 				CREATE TABLE IF NOT EXISTS url_clicks (
@@ -77,11 +82,11 @@ export class DatabaseService implements OnModuleInit {
 					updated_at timestamp
 				)
       		`);
-			
+
 			await this.client.execute(`
 				CREATE INDEX IF NOT EXISTS users_email_idx ON users (email)
 			`);
-			
+
 			this.logger.log('✅ Created/Verified Tables');
 		} catch (error) {
 			this.logger.error('❌ Failed to create tables:', error.message);

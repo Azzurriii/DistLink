@@ -7,6 +7,9 @@ export class UrlResponseDto {
 	@ApiProperty()
 	originalUrl: string;
 
+	@ApiProperty({ required: false })
+	userId?: string;
+
 	@ApiProperty()
 	createdAt: Date;
 
