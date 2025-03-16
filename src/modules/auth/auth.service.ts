@@ -229,4 +229,25 @@ export class AuthService {
 	private async sendPasswordResetEmail(email: string, name: string, resetLink: string) {
 		return this.mailerService.sendPasswordResetEmail(email, name, resetLink);
 	}
+
+	async changePassword(userId: string, currentPassword: string, newPassword: string) {
+		const user = await this.usersService.findById(userId);
+		
+		if (!user) {
+			throw new UnauthorizedException('User not found');
+		}
+		
+		const userWithPassword = await this.usersService.findByEmail(user.email);
+		const isPasswordValid = await bcrypt.compare(currentPassword, userWithPassword.password);
+		
+		if (!isPasswordValid) {
+			throw new BadRequestException('Current password is incorrect');
+		}
+		
+		await this.usersService.updatePassword(userId, newPassword);
+		
+		return {
+			message: 'Password changed successfully',
+		};
+	}
 }

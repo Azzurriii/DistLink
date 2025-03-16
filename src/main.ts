@@ -1,22 +1,32 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
 	const app = await NestFactory.create(AppModule);
-	app.useGlobalPipes(new ValidationPipe());
-
+	
+	// Validation pipe
+	app.useGlobalPipes(new ValidationPipe({
+		whitelist: true,
+		transform: true,
+	}));
+	
+	// CORS
+	app.enableCors();
+	
+	// Swagger
 	const config = new DocumentBuilder()
-		.setTitle('URL Shortener API')
-		.setDescription('API for URL shortening service')
+		.setTitle('DistLink API')
+		.setDescription('API documentation for DistLink URL shortener')
 		.setVersion('1.0')
-		.addTag('urls')
+		.addBearerAuth()
 		.build();
+	
 	const document = SwaggerModule.createDocument(app, config);
 	SwaggerModule.setup('docs', app, document);
-
-	await app.listen(process.env.PORT ?? 8000);
+	
+	const port = process.env.APP_PORT || 8000;
+	await app.listen(port);
 }
-
 bootstrap();
