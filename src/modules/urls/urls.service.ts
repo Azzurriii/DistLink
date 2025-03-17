@@ -67,7 +67,7 @@ export class UrlsService {
 			try {
 				await this.createUrlRecord(shortCode, dto.originalUrl, userId, now, expiresAt);
 				await this.invalidateMultipleKeys(['all', userId ? `user:${userId}` : null].filter(Boolean));
-				
+
 				return new UrlResponseDto({
 					shortCode,
 					originalUrl: dto.originalUrl,
@@ -181,15 +181,15 @@ export class UrlsService {
 
 	async remove(shortCode: string): Promise<void> {
 		const client = this.databaseService.getClient();
-		
+
 		try {
 			const urlResult = await client.execute('SELECT user_id FROM urls WHERE short_code = ?', [shortCode], {
 				prepare: true,
 			});
-			
+
 			if (urlResult.rows.length > 0) {
 				const userId = urlResult.first().user_id;
-				
+
 				await Promise.all([
 					client.execute('DELETE FROM urls WHERE short_code = ?', [shortCode], {
 						prepare: true,
@@ -244,8 +244,8 @@ export class UrlsService {
 			);
 
 			await Promise.all([
-				this.remove(shortCode), 
-				this.invalidateMultipleKeys(['all', oldUrl.user_id ? `user:${oldUrl.user_id}` : null].filter(Boolean))
+				this.remove(shortCode),
+				this.invalidateMultipleKeys(['all', oldUrl.user_id ? `user:${oldUrl.user_id}` : null].filter(Boolean)),
 			]);
 
 			// Return response

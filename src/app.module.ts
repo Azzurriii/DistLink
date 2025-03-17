@@ -16,6 +16,10 @@ import { ClicksModule } from './modules/clicks/clicks.module';
 import { MonitoringModule } from './modules/monitoring/monitoring.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
+import { DatabaseModule } from './modules/database/database.module';
+import { MailerModule } from './modules/mailer/mailer.module';
+import { QueueModule } from './modules/queue/queue.module';
+
 @Module({
 	imports: [
 		ConfigModule.forRoot({
@@ -31,6 +35,9 @@ import { UsersModule } from './modules/users/users.module';
 		MonitoringModule,
 		AuthModule,
 		UsersModule,
+		DatabaseModule,
+		MailerModule,
+		QueueModule,
 	],
 	controllers: [AppController],
 	providers: [

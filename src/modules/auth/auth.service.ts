@@ -5,7 +5,7 @@ import { RedisService } from '../redis/redis.service';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { UsersService } from '../users/users.service';
-import { MailerService } from '../mailer/mailer.service';
+import { EmailQueueService } from '../queue/services/email-queue.service';
 
 @Injectable()
 export class AuthService {
@@ -14,7 +14,7 @@ export class AuthService {
 		private readonly jwtService: JwtService,
 		private readonly configService: ConfigService,
 		private readonly redisService: RedisService,
-		private readonly mailerService: MailerService,
+		private readonly emailQueueService: EmailQueueService,
 	) {}
 
 	async validateUser(email: string, password: string): Promise<any> {
@@ -58,21 +58,23 @@ export class AuthService {
 	async register(userData: { email: string; password: string; fullName: string }) {
 		const user = await this.usersService.create(userData);
 
-		// Generate verification token
-		const verificationToken = uuidv4();
+		// Thay vì tạo UUID token, sử dụng JWT token
+		const token = this.jwtService.sign(
+			{ sub: user.id, email: user.email },
+			{ expiresIn: '24h', secret: this.configService.get('JWT_SECRET') },
+		);
 
-		// Store token in Redis with expiration (24 hours)
+		// Lưu token vào Redis (tùy chọn, có thể bỏ vì JWT đã có thông tin)
 		await this.redisService.set(
-			`verification_token:${verificationToken}`,
-			user.id,
+			`verification_token:${user.id}`,
+			token,
 			24 * 60 * 60, // 24 hours
 		);
 
-		// Send verification email
-		const verificationLink = `${this.configService.get('BASE_URL')}/auth/verify-email/${verificationToken}`;
+		// Gửi email với token JWT
+		const verificationLink = `${this.configService.get('BASE_URL')}/auth/verify-email?token=${token}`;
 
-		// Send email with verification link
-		await this.sendVerificationEmail(user.email, user.fullName, verificationLink);
+		await this.emailQueueService.addVerificationEmailJob(user.email, user.fullName, verificationLink);
 
 		return {
 			message: 'Registration successful. Please check your email to verify your account.',
@@ -85,22 +87,21 @@ export class AuthService {
 	}
 
 	async verifyEmail(token: string) {
-		// Get user ID from Redis
-		const userId = await this.redisService.get(`verification_token:${token}`);
+		try {
+			const payload = this.jwtService.verify(token, {
+				secret: this.configService.get('JWT_SECRET'),
+			});
 
-		if (!userId) {
+			await this.usersService.activateUser(payload.sub);
+
+			await this.redisService.del(`verification_token:${payload.sub}`);
+
+			return {
+				message: 'Email verified successfully. You can now log in.',
+			};
+		} catch (error) {
 			throw new BadRequestException('Invalid or expired verification token');
 		}
-
-		// Activate user account
-		await this.usersService.activateUser(userId);
-
-		// Delete token from Redis
-		await this.redisService.del(`verification_token:${token}`);
-
-		return {
-			message: 'Email verified successfully. You can now log in.',
-		};
 	}
 
 	async refreshToken(refreshToken: string) {
@@ -148,27 +149,30 @@ export class AuthService {
 		const user = await this.usersService.findByEmail(email);
 
 		if (!user) {
-			// Don't reveal that the user doesn't exist
+			// Không tiết lộ rằng người dùng không tồn tại
 			return {
 				message: 'If your email is registered, you will receive a password reset link',
 			};
 		}
 
-		// Generate reset token
-		const resetToken = uuidv4();
+		// Tạo JWT token thay vì UUID
+		const token = this.jwtService.sign(
+			{ sub: user.id, email: user.email },
+			{ expiresIn: '1h', secret: this.configService.get('JWT_SECRET') },
+		);
 
-		// Store token in Redis with expiration (1 hour)
+		// Lưu token vào Redis (tùy chọn)
 		await this.redisService.set(
-			`reset_token:${resetToken}`,
-			user.id,
+			`reset_token:${user.id}`,
+			token,
 			3600, // 1 hour
 		);
 
-		// Create reset link
-		const resetLink = `${this.configService.get('BASE_URL')}/auth/reset-password/${resetToken}`;
+		// Tạo link đặt lại mật khẩu với JWT token
+		const resetLink = `${this.configService.get('BASE_URL')}/auth/reset-password?token=${token}`;
 
-		// Send email with reset link
-		await this.sendPasswordResetEmail(user.email, user.fullName, resetLink);
+		// Gửi email với link đặt lại mật khẩu
+		await this.emailQueueService.addPasswordResetEmailJob(user.email, user.fullName, resetLink);
 
 		return {
 			message: 'If your email is registered, you will receive a password reset link',
@@ -176,22 +180,24 @@ export class AuthService {
 	}
 
 	async resetPassword(token: string, newPassword: string) {
-		// Get user ID from Redis
-		const userId = await this.redisService.get(`reset_token:${token}`);
+		try {
+			// Xác thực JWT token
+			const payload = this.jwtService.verify(token, {
+				secret: this.configService.get('JWT_SECRET'),
+			});
 
-		if (!userId) {
+			// Cập nhật mật khẩu
+			await this.usersService.updatePassword(payload.sub, newPassword);
+
+			// Xóa token từ Redis nếu có
+			await this.redisService.del(`reset_token:${payload.sub}`);
+
+			return {
+				message: 'Password reset successful',
+			};
+		} catch (error) {
 			throw new BadRequestException('Invalid or expired reset token');
 		}
-
-		// Update password
-		await this.usersService.updatePassword(userId, newPassword);
-
-		// Delete token from Redis
-		await this.redisService.del(`reset_token:${token}`);
-
-		return {
-			message: 'Password reset successful',
-		};
 	}
 
 	private async generateTokens(user: any) {
@@ -222,12 +228,30 @@ export class AuthService {
 		);
 	}
 
-	private async sendVerificationEmail(email: string, name: string, verificationLink: string) {
-		return this.mailerService.sendVerificationEmail(email, name, verificationLink);
+	async sendVerificationEmail(userId: string, email: string, fullName: string) {
+		const token = this.jwtService.sign(
+			{ sub: userId, email },
+			{ expiresIn: '24h', secret: this.configService.get('JWT_SECRET') },
+		);
+
+		// Thay đổi URL để frontend xử lý token
+		// Frontend sẽ gọi API POST /auth/verify-email với token này
+		const verificationLink = `${this.configService.get('BASE_URL')}/verify-email?token=${token}`;
+
+		await this.emailQueueService.addVerificationEmailJob(email, fullName, verificationLink);
 	}
 
-	private async sendPasswordResetEmail(email: string, name: string, resetLink: string) {
-		return this.mailerService.sendPasswordResetEmail(email, name, resetLink);
+	async sendPasswordResetEmail(user) {
+		const token = this.jwtService.sign(
+			{ sub: user.id, email: user.email },
+			{ expiresIn: '1h', secret: this.configService.get('JWT_SECRET') },
+		);
+
+		// Thay đổi URL để frontend xử lý token
+		// Frontend sẽ gọi API POST /auth/reset-password với token này
+		const resetLink = `${this.configService.get('BASE_URL')}/reset-password?token=${token}`;
+
+		await this.emailQueueService.addPasswordResetEmailJob(user.email, user.fullName, resetLink);
 	}
 
 	async changePassword(userId: string, currentPassword: string, newPassword: string) {

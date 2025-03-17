@@ -39,14 +39,14 @@ export class UrlsController {
 	@ApiResponse({ status: 201, type: UrlResponseDto })
 	async create(@Body() createUrlDto: CreateUrlDto, @Request() req): Promise<UrlResponseDto> {
 		console.log('User from request:', req.user);
-		
+
 		let userId = null;
 		if (req.user && req.user.id) {
 			userId = req.user.id.toString();
 		}
-		
+
 		console.log('User ID extracted:', userId);
-		
+
 		return this.urlsService.create(createUrlDto, userId);
 	}
 
@@ -100,11 +100,11 @@ export class UrlsController {
 	async remove(@Param('shortCode') shortCode: string, @Request() req): Promise<void> {
 		const url = await this.urlsService.findByShortCode(shortCode);
 		const userId = req.user.id.toString();
-		
+
 		if (url.user_id && url.user_id !== userId) {
 			throw new BadRequestException('You are not authorized to delete this URL');
 		}
-		
+
 		await this.urlsService.remove(shortCode);
 	}
 
@@ -119,9 +119,9 @@ export class UrlsController {
 	@ApiResponse({ status: 429, description: 'Too many requests' })
 	@ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Not authorized to update this URL' })
 	async update(
-		@Param('shortCode') shortCode: string, 
+		@Param('shortCode') shortCode: string,
 		@Body() updateUrlDto: UpdateUrlDto,
-		@Request() req
+		@Request() req,
 	): Promise<UrlResponseDto> {
 		if (!/^[a-zA-Z0-9-_]{8,16}$/.test(shortCode)) {
 			throw new BadRequestException('Invalid short code format');
@@ -129,7 +129,7 @@ export class UrlsController {
 
 		const url = await this.urlsService.findByShortCode(shortCode);
 		const userId = req.user.id.toString();
-		
+
 		if (url.user_id && url.user_id !== userId) {
 			throw new BadRequestException('You are not authorized to update this URL');
 		}

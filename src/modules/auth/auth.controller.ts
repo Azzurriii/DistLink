@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, UseGuards, Req, HttpCode, HttpStatus, Param } from '@nestjs/common';
+import { Controller, Post, Body, Get, UseGuards, Req, HttpCode, HttpStatus, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -107,6 +107,24 @@ export class AuthController {
 		return this.authService.register(registerDto);
 	}
 
+	@Post('verify-email')
+	@HttpCode(HttpStatus.OK)
+	@ApiOperation({ summary: 'Verify email address' })
+	@ApiResponse({ status: 200, description: 'Email verified successfully' })
+	@ApiResponse({ status: 400, description: 'Invalid or expired token' })
+	@ApiBody({
+		schema: {
+			type: 'object',
+			required: ['token'],
+			properties: {
+				token: { type: 'string', example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' },
+			},
+		},
+	})
+	async verifyEmail(@Body() verifyEmailDto: { token: string }) {
+		return this.authService.verifyEmail(verifyEmailDto.token);
+	}
+
 	@Post('refresh-token')
 	@HttpCode(HttpStatus.OK)
 	@ApiOperation({ summary: 'Refresh access token' })
@@ -134,8 +152,8 @@ export class AuthController {
 			},
 		},
 	})
-	async refreshToken(@Body() body: { refreshToken: string }) {
-		return this.authService.refreshToken(body.refreshToken);
+	async refreshToken(@Body() refreshTokenDto: { refreshToken: string }) {
+		return this.authService.refreshToken(refreshTokenDto.refreshToken);
 	}
 
 	@Post('logout')
@@ -186,8 +204,8 @@ export class AuthController {
 			},
 		},
 	})
-	async forgotPassword(@Body() body: { email: string }) {
-		return this.authService.forgotPassword(body.email);
+	async forgotPassword(@Body() forgotPasswordDto: { email: string }) {
+		return this.authService.forgotPassword(forgotPasswordDto.email);
 	}
 
 	@Post('reset-password')
@@ -207,21 +225,21 @@ export class AuthController {
 	@ApiBody({
 		schema: {
 			type: 'object',
-			required: ['token', 'password'],
+			required: ['token', 'newPassword'],
 			properties: {
 				token: {
 					type: 'string',
 					example: '550e8400-e29b-41d4-a716-446655440000',
 				},
-				password: {
+				newPassword: {
 					type: 'string',
 					example: 'NewStrongP@ssw0rd',
 				},
 			},
 		},
 	})
-	async resetPassword(@Body() body: { token: string; password: string }) {
-		return this.authService.resetPassword(body.token, body.password);
+	async resetPassword(@Body() resetPasswordDto: { token: string; newPassword: string }) {
+		return this.authService.resetPassword(resetPasswordDto.token, resetPasswordDto.newPassword);
 	}
 
 	@Get('me')
@@ -248,30 +266,6 @@ export class AuthController {
 		return req.user;
 	}
 
-	@Get('verify-email/:token')
-	@HttpCode(HttpStatus.OK)
-	@ApiOperation({ summary: 'Verify email address with token' })
-	@ApiParam({
-		name: 'token',
-		type: 'string',
-		description: 'Email verification token',
-		example: '550e8400-e29b-41d4-a716-446655440000',
-	})
-	@ApiResponse({
-		status: 200,
-		description: 'Email verified successfully',
-		schema: {
-			type: 'object',
-			properties: {
-				message: { type: 'string', example: 'Email verified successfully. You can now log in.' },
-			},
-		},
-	})
-	@ApiResponse({ status: 400, description: 'Invalid or expired token' })
-	async verifyEmail(@Param('token') token: string) {
-		return this.authService.verifyEmail(token);
-	}
-
 	@Get('check-token')
 	@UseGuards(JwtAuthGuard)
 	@ApiBearerAuth()
@@ -295,7 +289,7 @@ export class AuthController {
 	@UseGuards(JwtAuthGuard)
 	@ApiBearerAuth()
 	@HttpCode(HttpStatus.OK)
-	@ApiOperation({ summary: 'Change password (requires authentication)' })
+	@ApiOperation({ summary: 'Change password' })
 	@ApiResponse({
 		status: 200,
 		description: 'Password changed successfully',
@@ -306,7 +300,6 @@ export class AuthController {
 			},
 		},
 	})
-	@ApiResponse({ status: 401, description: 'Unauthorized' })
 	@ApiResponse({ status: 400, description: 'Current password is incorrect' })
 	@ApiBody({
 		schema: {
@@ -324,7 +317,14 @@ export class AuthController {
 			},
 		},
 	})
-	async changePassword(@Req() req: Request, @Body() body: { currentPassword: string; newPassword: string }) {
-		return this.authService.changePassword(req.user['id'], body.currentPassword, body.newPassword);
+	async changePassword(
+		@Req() req: Request,
+		@Body() changePasswordDto: { currentPassword: string; newPassword: string },
+	) {
+		return this.authService.changePassword(
+			req.user['id'],
+			changePasswordDto.currentPassword,
+			changePasswordDto.newPassword,
+		);
 	}
 }

@@ -8,21 +8,23 @@ import { UsersModule } from '../users/users.module';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { RedisModule } from '../redis/redis.module';
 import { MailerModule } from '../mailer/mailer.module';
+import { QueueModule } from '../queue/queue.module';
 
 @Module({
 	imports: [
 		PassportModule,
 		JwtModule.registerAsync({
 			imports: [ConfigModule],
-			useFactory: async (configService: ConfigService) => ({
-				secret: configService.get('JWT_SECRET'),
-				signOptions: { expiresIn: '15m' },
-			}),
 			inject: [ConfigService],
+			useFactory: (configService: ConfigService) => ({
+				secret: configService.get('JWT_SECRET'),
+				signOptions: { expiresIn: configService.get('JWT_EXPIRATION_TIME') },
+			}),
 		}),
 		UsersModule,
 		RedisModule,
 		MailerModule,
+		QueueModule,
 	],
 	controllers: [AuthController],
 	providers: [AuthService, JwtStrategy],
