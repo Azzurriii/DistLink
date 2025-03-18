@@ -3,7 +3,6 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { RedisService } from '../redis/redis.service';
 import * as bcrypt from 'bcrypt';
-import { v4 as uuidv4 } from 'uuid';
 import { UsersService } from '../users/users.service';
 import { EmailQueueService } from '../queue/services/email-queue.service';
 
@@ -58,20 +57,17 @@ export class AuthService {
 	async register(userData: { email: string; password: string; fullName: string }) {
 		const user = await this.usersService.create(userData);
 
-		// Thay vì tạo UUID token, sử dụng JWT token
 		const token = this.jwtService.sign(
 			{ sub: user.id, email: user.email },
 			{ expiresIn: '24h', secret: this.configService.get('JWT_SECRET') },
 		);
 
-		// Lưu token vào Redis (tùy chọn, có thể bỏ vì JWT đã có thông tin)
 		await this.redisService.set(
 			`verification_token:${user.id}`,
 			token,
 			24 * 60 * 60, // 24 hours
 		);
 
-		// Gửi email với token JWT
 		const verificationLink = `${this.configService.get('BASE_URL')}/auth/verify-email?token=${token}`;
 
 		await this.emailQueueService.addVerificationEmailJob(user.email, user.fullName, verificationLink);
@@ -161,17 +157,14 @@ export class AuthService {
 			{ expiresIn: '1h', secret: this.configService.get('JWT_SECRET') },
 		);
 
-		// Lưu token vào Redis (tùy chọn)
 		await this.redisService.set(
 			`reset_token:${user.id}`,
 			token,
 			3600, // 1 hour
 		);
 
-		// Tạo link đặt lại mật khẩu với JWT token
 		const resetLink = `${this.configService.get('BASE_URL')}/auth/reset-password?token=${token}`;
 
-		// Gửi email với link đặt lại mật khẩu
 		await this.emailQueueService.addPasswordResetEmailJob(user.email, user.fullName, resetLink);
 
 		return {
@@ -181,15 +174,12 @@ export class AuthService {
 
 	async resetPassword(token: string, newPassword: string) {
 		try {
-			// Xác thực JWT token
 			const payload = this.jwtService.verify(token, {
 				secret: this.configService.get('JWT_SECRET'),
 			});
 
-			// Cập nhật mật khẩu
 			await this.usersService.updatePassword(payload.sub, newPassword);
 
-			// Xóa token từ Redis nếu có
 			await this.redisService.del(`reset_token:${payload.sub}`);
 
 			return {
@@ -234,8 +224,6 @@ export class AuthService {
 			{ expiresIn: '24h', secret: this.configService.get('JWT_SECRET') },
 		);
 
-		// Thay đổi URL để frontend xử lý token
-		// Frontend sẽ gọi API POST /auth/verify-email với token này
 		const verificationLink = `${this.configService.get('BASE_URL')}/verify-email?token=${token}`;
 
 		await this.emailQueueService.addVerificationEmailJob(email, fullName, verificationLink);
@@ -247,8 +235,6 @@ export class AuthService {
 			{ expiresIn: '1h', secret: this.configService.get('JWT_SECRET') },
 		);
 
-		// Thay đổi URL để frontend xử lý token
-		// Frontend sẽ gọi API POST /auth/reset-password với token này
 		const resetLink = `${this.configService.get('BASE_URL')}/reset-password?token=${token}`;
 
 		await this.emailQueueService.addPasswordResetEmailJob(user.email, user.fullName, resetLink);

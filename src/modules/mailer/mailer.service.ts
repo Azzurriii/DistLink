@@ -19,7 +19,7 @@ export class MailerService {
 	private initializeTransporter() {
 		this.transporter = nodemailer.createTransport({
 			host: this.configService.get('EMAIL_HOST'),
-			port: 587,
+			port: this.configService.get('EMAIL_PORT') || 587,
 			secure: false,
 			auth: {
 				user: this.configService.get('EMAIL_USER'),
