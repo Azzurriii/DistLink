@@ -12,6 +12,39 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4  # Get source code into _work/<repo-name>/<repo-name>
 
+      - name: Create env file
+        run: |
+          echo "APP_PORT=${{ secrets.APP_PORT }}" >> .env
+          echo "BASE_URL=${{ secrets.BASE_URL }}" >> .env
+          echo "NODE_ENV=${{ secrets.NODE_ENV }}" >> .env
+          echo "SCYLLA_HOST=${{ secrets.SCYLLA_HOST }}" >> .env
+          echo "SCYLLA_PORT=${{ secrets.SCYLLA_PORT }}" >> .env
+          echo "SCYLLA_USERNAME=${{ secrets.SCYLLA_USERNAME }}" >> .env
+          echo "SCYLLA_PASSWORD=${{ secrets.SCYLLA_PASSWORD }}" >> .env
+          echo "SCYLLA_KEYSPACE=${{ secrets.SCYLLA_KEYSPACE }}" >> .env
+          echo "REDIS_HOST=${{ secrets.REDIS_HOST }}" >> .env
+          echo "REDIS_PORT=${{ secrets.REDIS_PORT }}" >> .env
+          echo "REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}" >> .env
+          echo "REDIS_DB=${{ secrets.REDIS_DB }}" >> .env
+          echo "KAFKA_BROKERS=${{ secrets.KAFKA_BROKERS }}" >> .env
+          echo "KAFKA_CLIENT_ID=${{ secrets.KAFKA_CLIENT_ID }}" >> .env
+          echo "KAFKA_GROUP_ID=${{ secrets.KAFKA_GROUP_ID }}" >> .env
+          echo "CLICKHOUSE_HOST=${{ secrets.CLICKHOUSE_HOST }}" >> .env
+          echo "CLICKHOUSE_PORT=${{ secrets.CLICKHOUSE_PORT }}" >> .env
+          echo "CLICKHOUSE_DATABASE=${{ secrets.CLICKHOUSE_DATABASE }}" >> .env
+          echo "RATE_LIMIT_TTL=${{ secrets.RATE_LIMIT_TTL }}" >> .env
+          echo "RATE_LIMIT_LIMIT=${{ secrets.RATE_LIMIT_LIMIT }}" >> .env
+          echo "SAFE_BROWSING_API_KEY=${{ secrets.SAFE_BROWSING_API_KEY }}" >> .env
+          echo "EMAIL_HOST=${{ secrets.EMAIL_HOST }}" >> .env
+          echo "EMAIL_PORT=${{ secrets.EMAIL_PORT }}" >> .env
+          echo "EMAIL_USER=${{ secrets.EMAIL_USER }}" >> .env
+          echo "EMAIL_PASSWORD=${{ secrets.EMAIL_PASSWORD }}" >> .env
+          echo "EMAIL_FROM=${{ secrets.EMAIL_FROM }}" >> .env
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
+          echo "JWT_EXPIRATION_TIME=${{ secrets.JWT_EXPIRATION_TIME }}" >> .env
+          echo "JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}" >> .env
+          echo "JWT_REFRESH_TOKEN_EXPIRATION_TIME=${{ secrets.JWT_REFRESH_TOKEN_EXPIRATION_TIME }}" >> .env
+
       - name: Deploy App
         run: |
           git pull origin main
@@ -25,15 +58,5 @@ jobs:
           docker run -d --name distlink-app \
             --network distlink-network \
             -p 8000:8000 \
-            -e NODE_ENV=${{ secrets.NODE_ENV }} \
-            -e SCYLLA_HOST=${{ secrets.SCYLLA_HOST }} \
-            -e REDIS_HOST=${{ secrets.REDIS_HOST }} \
-            -e REDIS_PORT=${{ secrets.REDIS_PORT }} \
-            -e KAFKA_BROKERS=${{ secrets.KAFKA_BROKERS }} \
-            -e CLICKHOUSE_HOST=${{ secrets.CLICKHOUSE_HOST }} \
-            -e CLICKHOUSE_PORT=${{ secrets.CLICKHOUSE_PORT }} \
-            -e SCYLLA_PORT=${{ secrets.SCYLLA_PORT }} \
-            -e SCYLLA_USERNAME=${{ secrets.SCYLLA_USERNAME }} \
-            -e SCYLLA_PASSWORD=${{ secrets.SCYLLA_PASSWORD }} \
-            -e SCYLLA_KEYSPACE=${{ secrets.SCYLLA_KEYSPACE }} \
+            --env-file .env \
             dist-link:latest
