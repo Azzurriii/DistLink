@@ -19,6 +19,7 @@ import { UsersModule } from './modules/users/users.module';
 import { DatabaseModule } from './modules/database/database.module';
 import { MailerModule } from './modules/mailer/mailer.module';
 import { QueueModule } from './modules/queue/queue.module';
+import { SafeBrowsingModule } from './modules/safe-browsing/safe-browsing.module';
 
 @Module({
 	imports: [
@@ -38,6 +39,7 @@ import { QueueModule } from './modules/queue/queue.module';
 		DatabaseModule,
 		MailerModule,
 		QueueModule,
+		SafeBrowsingModule,
 	],
 	controllers: [AppController],
 	providers: [

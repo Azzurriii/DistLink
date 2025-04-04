@@ -66,17 +66,15 @@ export class ClicksService {
 		this.lastRequestTime = now;
 
 		try {
-			console.log('ipAddress', ipAddress);
 			const response = await axios.get(`http://ip-api.com/json/${ipAddress}`);
 			const country = response.data && response.data.country ? response.data.country : 'Unknown';
-			console.log('country', country);
+
 			// Cache the result
 			this.countryCache.set(ipAddress, { country, timestamp: Date.now() });
 			return country;
 		} catch (error) {
 			this.logger.warn(`Error getting country information: ${error.message}`);
 
-			// If we have an old cached value, use it instead of 'Unknown'
 			if (cached) {
 				return cached.country;
 			}
@@ -86,7 +84,6 @@ export class ClicksService {
 	}
 
 	private isLocalIpAddress(ip: string): boolean {
-		// IPv4 local addresses
 		if (
 			ip === '127.0.0.1' ||
 			ip.startsWith('10.') ||
@@ -96,7 +93,6 @@ export class ClicksService {
 			return true;
 		}
 
-		// IPv6 local addresses
 		if (
 			ip === '::1' || // IPv6 loopback
 			ip.toLowerCase().startsWith('fc') || // IPv6 unique local

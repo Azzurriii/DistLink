@@ -37,15 +37,12 @@ export class UrlsController {
 	@RateLimit({ limit: 10, window: 60 })
 	@ApiOperation({ summary: 'Create a short URL' })
 	@ApiResponse({ status: 201, type: UrlResponseDto })
+	@ApiResponse({ status: 400, description: 'URL identified as potentially harmful by Google Safe Browsing' })
 	async create(@Body() createUrlDto: CreateUrlDto, @Request() req): Promise<UrlResponseDto> {
-		console.log('User from request:', req.user);
-
 		let userId = null;
 		if (req.user && req.user.id) {
 			userId = req.user.id.toString();
 		}
-
-		console.log('User ID extracted:', userId);
 
 		return this.urlsService.create(createUrlDto, userId);
 	}
@@ -117,6 +114,10 @@ export class UrlsController {
 	@ApiResponse({ status: 404, description: 'URL not found' })
 	@ApiResponse({ status: 409, description: 'Custom code already taken' })
 	@ApiResponse({ status: 429, description: 'Too many requests' })
+	@ApiResponse({
+		status: 400,
+		description: 'Invalid short code format or URL identified as potentially harmful by Google Safe Browsing',
+	})
 	@ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Not authorized to update this URL' })
 	async update(
 		@Param('shortCode') shortCode: string,

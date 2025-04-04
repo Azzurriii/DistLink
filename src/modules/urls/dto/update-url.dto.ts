@@ -1,4 +1,4 @@
-import { IsString, Matches, IsOptional } from 'class-validator';
+import { IsString, Matches, IsOptional, IsUrl } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { ExpirationOption } from './create-url.dto';
 
@@ -15,4 +15,12 @@ export class UpdateUrlDto {
 	@IsOptional()
 	@ApiProperty({ enum: ExpirationOption })
 	expiration?: ExpirationOption;
+
+	@IsOptional()
+	@IsUrl()
+	@ApiProperty({
+		required: false,
+		description: 'New URL to use (when updating an existing shortened URL)',
+	})
+	originalUrl?: string;
 }

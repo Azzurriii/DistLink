@@ -1,4 +1,11 @@
-import { Injectable, Logger, NotFoundException, ConflictException, InternalServerErrorException } from '@nestjs/common';
+import {
+	Injectable,
+	Logger,
+	NotFoundException,
+	ConflictException,
+	InternalServerErrorException,
+	BadRequestException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CreateUrlDto } from './dto/create-url.dto';
 import { UrlResponseDto } from './dto/url-response.dto';
@@ -8,6 +15,7 @@ import { RedisService } from '../redis/redis.service';
 import { ExpirationOption } from './dto/create-url.dto';
 import { ShortCodeGenerator } from '../../utils/short-code.generator';
 import { UpdateUrlDto } from './dto/update-url.dto';
+import { SafeBrowsingService } from '../safe-browsing/safe-browsing.service';
 
 @Injectable()
 export class UrlsService {
@@ -21,6 +29,7 @@ export class UrlsService {
 		private readonly databaseService: DatabaseService,
 		private readonly configService: ConfigService,
 		private readonly redisService: RedisService,
+		private readonly safeBrowsingService: SafeBrowsingService,
 	) {
 		this.baseUrl = this.configService.get('BASE_URL') || 'https://distl.space';
 		this.initializeCodePool();
@@ -56,11 +65,17 @@ export class UrlsService {
 	}
 
 	async create(dto: CreateUrlDto, userId?: string): Promise<UrlResponseDto> {
-		const client = this.databaseService.getClient();
+		// Check if URL is safe using Google Safe Browsing API
+		const safetyCheck = await this.safeBrowsingService.checkUrl(dto.originalUrl);
+		if (!safetyCheck.isSafe) {
+			throw new BadRequestException({
+				message: 'This URL has been identified as potentially harmful',
+				threats: safetyCheck.threats,
+			});
+		}
+
 		const now = new Date();
 		const expiresAt = this.calculateExpirationDate(dto.expiration);
-
-		console.log('Creating URL with userId:', userId);
 
 		for (let attempt = 0; attempt < UrlsService.RETRY_ATTEMPTS; attempt++) {
 			const shortCode = await this.getNextCode();
@@ -221,15 +236,23 @@ export class UrlsService {
 	async update(shortCode: string, updateUrlDto: UpdateUrlDto): Promise<UrlResponseDto> {
 		try {
 			const client = this.databaseService.getClient();
-			const { newCode, expiration } = updateUrlDto;
+			const { newCode, expiration, originalUrl } = updateUrlDto;
 
-			// Validate and find old URL
 			const oldUrl = await this.findByShortCode(shortCode);
 			if (!oldUrl) {
 				throw new NotFoundException('URL not found');
 			}
 
-			// Check if newCode already exists
+			if (originalUrl && originalUrl !== oldUrl.original_url) {
+				const safetyCheck = await this.safeBrowsingService.checkUrl(originalUrl);
+				if (!safetyCheck.isSafe) {
+					throw new BadRequestException({
+						message: 'This URL has been identified as potentially harmful',
+						threats: safetyCheck.threats,
+					});
+				}
+			}
+
 			const existingUrl = await client.execute(
 				'SELECT short_code FROM link_urls WHERE short_code = ?',
 				[newCode],
@@ -242,7 +265,6 @@ export class UrlsService {
 				throw new ConflictException('This custom short code is already taken');
 			}
 
-			// Perform update in transaction
 			await this.createUrlRecord(
 				newCode,
 				oldUrl.original_url,
@@ -256,7 +278,6 @@ export class UrlsService {
 				this.invalidateMultipleKeys(['all', oldUrl.user_id ? `user:${oldUrl.user_id}` : null].filter(Boolean)),
 			]);
 
-			// Return response
 			return new UrlResponseDto({
 				shortCode: newCode,
 				originalUrl: oldUrl.original_url,
