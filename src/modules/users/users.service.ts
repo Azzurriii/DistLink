@@ -58,6 +58,7 @@ export class UsersService {
 		return {
 			id: user.id,
 			email: user.email,
+			password: user.password,
 			fullName: user.full_name,
 			createdAt: user.created_at,
 			updatedAt: user.updated_at,
@@ -79,6 +80,7 @@ export class UsersService {
 		return {
 			id: user.id,
 			email: user.email,
+			password: user.password,
 			fullName: user.full_name,
 			createdAt: user.created_at,
 			updatedAt: user.updated_at,

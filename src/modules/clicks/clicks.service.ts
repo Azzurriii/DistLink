@@ -159,14 +159,25 @@ export class ClicksService {
 			`SELECT country, SUM(click_count) as clicks 
        FROM link_click_stats 
        WHERE link_id = ? 
-       GROUP BY country`,
+       GROUP BY count_date, country`,
 			[linkId],
 			{ prepare: true },
 		);
 
-		return result.rows.map((row) => ({
-			country: row.country,
-			clicks: row.clicks,
+		// Aggregate by country across all dates
+		const countryMap = new Map<string, number>();
+
+		result.rows.forEach((row) => {
+			const country = row.country;
+			const clicks = parseInt(row.clicks) || 0;
+
+			const currentClicks = countryMap.get(country) || 0;
+			countryMap.set(country, currentClicks + clicks);
+		});
+
+		return Array.from(countryMap.entries()).map(([country, clicks]) => ({
+			country,
+			clicks,
 		}));
 	}
 
@@ -197,28 +208,34 @@ export class ClicksService {
 			dates.push(dt.toISOString().split('T')[0]);
 		}
 
-		const query = `
-      SELECT count_date, country, click_count
-      FROM link_click_stats
-      WHERE link_id = ? AND count_date IN ?
-    `;
-
-		const result = await client.execute(query, [linkId, dates], { prepare: true });
-
+		const BATCH_SIZE = 7;
 		const dailyData = {};
-		result.rows.forEach((row) => {
-			const dateStr = row.count_date.toISOString().split('T')[0];
-			if (!dailyData[dateStr]) {
-				dailyData[dateStr] = {
-					date: dateStr,
-					totalClicks: 0,
-					countries: {},
-				};
-			}
 
-			dailyData[dateStr].countries[row.country] = row.click_count;
-			dailyData[dateStr].totalClicks += row.click_count;
-		});
+		for (let i = 0; i < dates.length; i += BATCH_SIZE) {
+			const batchDates = dates.slice(i, i + BATCH_SIZE);
+
+			const query = `
+				SELECT count_date, country, click_count
+				FROM link_click_stats
+				WHERE link_id = ? AND count_date IN ?
+			`;
+
+			const batchResult = await client.execute(query, [linkId, batchDates], { prepare: true });
+
+			batchResult.rows.forEach((row) => {
+				const dateStr = row.count_date.toString().split('T')[0];
+				if (!dailyData[dateStr]) {
+					dailyData[dateStr] = {
+						date: dateStr,
+						totalClicks: 0,
+						countries: {},
+					};
+				}
+
+				dailyData[dateStr].countries[row.country] = row.click_count;
+				dailyData[dateStr].totalClicks += row.click_count;
+			});
+		}
 
 		return Object.values(dailyData);
 	}
