@@ -51,7 +51,7 @@ export class DatabaseService implements OnModuleInit {
 	private async initializeTables() {
 		try {
 			await this.client.execute(`
-				CREATE TABLE IF NOT EXISTS urls (
+				CREATE TABLE IF NOT EXISTS link_urls (
 					short_code text PRIMARY KEY,
 					original_url text,
 					user_id uuid,
@@ -61,18 +61,18 @@ export class DatabaseService implements OnModuleInit {
       		`);
 
 			await this.client.execute(`
-				CREATE INDEX IF NOT EXISTS urls_user_id_idx ON urls (user_id)
+				CREATE INDEX IF NOT EXISTS link_urls_user_id_idx ON link_urls (user_id)
 			`);
 
 			await this.client.execute(`
-				CREATE TABLE IF NOT EXISTS url_clicks (
+				CREATE TABLE IF NOT EXISTS link_click_counter (
 					short_code text PRIMARY KEY,
 					clicks counter
 				)
       		`);
 
 			await this.client.execute(`
-				CREATE TABLE IF NOT EXISTS users (
+				CREATE TABLE IF NOT EXISTS link_users (
 					id uuid PRIMARY KEY,
 					email text,
 					password text,
@@ -84,8 +84,30 @@ export class DatabaseService implements OnModuleInit {
       		`);
 
 			await this.client.execute(`
-				CREATE INDEX IF NOT EXISTS users_email_idx ON users (email)
+				CREATE INDEX IF NOT EXISTS link_users_email_idx ON link_users (email)
 			`);
+
+			await this.client.execute(`
+				CREATE TABLE IF NOT EXISTS link_click_events (
+				  link_id text,
+				  click_id uuid,
+				  ip_address text,
+				  country text,
+				  clicked_at timestamp,
+				  user_agent text,
+				  PRIMARY KEY ((link_id), clicked_at, click_id)
+				) WITH CLUSTERING ORDER BY (clicked_at DESC, click_id ASC)
+			  `);
+
+			await this.client.execute(`
+				CREATE TABLE IF NOT EXISTS link_click_stats (
+				  link_id text,
+				  count_date date,
+				  country text,
+				  click_count counter,
+				  PRIMARY KEY ((link_id), count_date, country)
+				)
+			  `);
 
 			this.logger.log('✅ Created/Verified Tables');
 		} catch (error) {

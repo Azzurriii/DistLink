@@ -90,10 +90,12 @@ export class UrlsService {
 
 		const client = this.databaseService.getClient();
 		const [urlResult, clicksResult] = await Promise.all([
-			client.execute('SELECT * FROM urls WHERE short_code = ?', [shortCode], {
+			client.execute('SELECT * FROM link_urls WHERE short_code = ?', [shortCode], {
 				prepare: true,
 			}),
-			client.execute('SELECT clicks FROM url_clicks WHERE short_code = ?', [shortCode], { prepare: true }),
+			client.execute('SELECT clicks FROM link_click_counter WHERE short_code = ?', [shortCode], {
+				prepare: true,
+			}),
 		]);
 
 		if (!urlResult.rows.length) {
@@ -126,8 +128,8 @@ export class UrlsService {
 
 		const client = this.databaseService.getClient();
 		const [urlsResult, clicksResult] = await Promise.all([
-			client.execute('SELECT * FROM urls', [], { prepare: true }),
-			client.execute('SELECT * FROM url_clicks', [], { prepare: true }),
+			client.execute('SELECT * FROM link_urls', [], { prepare: true }),
+			client.execute('SELECT * FROM link_click_counter', [], { prepare: true }),
 		]);
 
 		const clicksMap = new Map(clicksResult.rows.map((row) => [row.short_code, row.clicks || 0]));
@@ -156,8 +158,8 @@ export class UrlsService {
 
 		const client = this.databaseService.getClient();
 		const [urlsResult, clicksResult] = await Promise.all([
-			client.execute('SELECT * FROM urls WHERE user_id = ? ALLOW FILTERING', [userId], { prepare: true }),
-			client.execute('SELECT * FROM url_clicks', [], { prepare: true }),
+			client.execute('SELECT * FROM link_urls WHERE user_id = ? ALLOW FILTERING', [userId], { prepare: true }),
+			client.execute('SELECT * FROM link_click_counter', [], { prepare: true }),
 		]);
 
 		const clicksMap = new Map(clicksResult.rows.map((row) => [row.short_code, row.clicks || 0]));
@@ -183,7 +185,7 @@ export class UrlsService {
 		const client = this.databaseService.getClient();
 
 		try {
-			const urlResult = await client.execute('SELECT user_id FROM urls WHERE short_code = ?', [shortCode], {
+			const urlResult = await client.execute('SELECT user_id FROM link_urls WHERE short_code = ?', [shortCode], {
 				prepare: true,
 			});
 
@@ -191,10 +193,12 @@ export class UrlsService {
 				const userId = urlResult.first().user_id;
 
 				await Promise.all([
-					client.execute('DELETE FROM urls WHERE short_code = ?', [shortCode], {
+					client.execute('DELETE FROM link_urls WHERE short_code = ?', [shortCode], {
 						prepare: true,
 					}),
-					client.execute('DELETE FROM url_clicks WHERE short_code = ?', [shortCode], { prepare: true }),
+					client.execute('DELETE FROM link_click_counter WHERE short_code = ?', [shortCode], {
+						prepare: true,
+					}),
 					this.redisService.del(this.getRedisKey(shortCode)),
 					this.redisService.del(this.getRedisKey('all')),
 					userId ? this.redisService.del(this.getRedisKey(`user:${userId}`)) : Promise.resolve(),
@@ -208,7 +212,7 @@ export class UrlsService {
 
 	async incrementClicks(shortCode: string): Promise<void> {
 		const client = this.databaseService.getClient();
-		await client.execute('UPDATE url_clicks SET clicks = clicks + 1 WHERE short_code = ?', [shortCode], {
+		await client.execute('UPDATE link_click_counter SET clicks = clicks + 1 WHERE short_code = ?', [shortCode], {
 			prepare: true,
 		});
 		await this.updateClicksInCache(shortCode);
@@ -226,9 +230,13 @@ export class UrlsService {
 			}
 
 			// Check if newCode already exists
-			const existingUrl = await client.execute('SELECT short_code FROM urls WHERE short_code = ?', [newCode], {
-				prepare: true,
-			});
+			const existingUrl = await client.execute(
+				'SELECT short_code FROM link_urls WHERE short_code = ?',
+				[newCode],
+				{
+					prepare: true,
+				},
+			);
 
 			if (existingUrl.rows.length > 0) {
 				throw new ConflictException('This custom short code is already taken');
@@ -304,15 +312,21 @@ export class UrlsService {
 		expiresAt: Date | null,
 	): Promise<void> {
 		const client = this.databaseService.getClient();
-		await Promise.all([
-			client.execute(
-				'INSERT INTO urls (short_code, original_url, user_id, created_at, expires_at) VALUES (?, ?, ?, ?, ?) IF NOT EXISTS',
-				[shortCode, originalUrl, userId, now, expiresAt],
-				{ prepare: true },
-			),
-			client.execute('UPDATE url_clicks SET clicks = clicks + 0 WHERE short_code = ?', [shortCode], {
-				prepare: true,
-			}),
-		]);
+
+		try {
+			await Promise.all([
+				client.execute(
+					'INSERT INTO link_urls (short_code, original_url, user_id, created_at, expires_at) VALUES (?, ?, ?, ?, ?)',
+					[shortCode, originalUrl, userId, now, expiresAt],
+					{ prepare: true },
+				),
+				client.execute('UPDATE link_click_counter SET clicks = clicks + 0 WHERE short_code = ?', [shortCode], {
+					prepare: true,
+				}),
+			]);
+		} catch (error) {
+			this.logger.error(`Failed to create URL record: ${error.message}`);
+			throw new InternalServerErrorException('Failed to create URL record');
+		}
 	}
 }

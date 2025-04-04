@@ -9,9 +9,10 @@ import { ConfigModule } from '@nestjs/config';
 import { RateLimitGuard } from '../../common/guards/rate-limit.guard';
 import { Reflector } from '@nestjs/core';
 import { KafkaModule } from '../kafka/kafka.module';
+import { ClicksModule } from '../clicks/clicks.module';
 
 @Module({
-	imports: [DatabaseModule, RedisModule, ConfigModule, ScheduleModule.forRoot(), KafkaModule],
+	imports: [DatabaseModule, RedisModule, ConfigModule, ScheduleModule.forRoot(), KafkaModule, ClicksModule],
 	controllers: [UrlsController, RedirectController],
 	providers: [UrlsService, RateLimitGuard, Reflector],
 })

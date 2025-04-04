@@ -53,12 +53,11 @@ export class ClickHouseService implements OnModuleInit {
 	private async createTables() {
 		await this.client.exec({
 			query: `
-        CREATE TABLE IF NOT EXISTS url_clicks (
+        CREATE TABLE IF NOT EXISTS link_click_events (
           short_code String,
           click_time DateTime,
           ip_address String,
-          user_agent String,
-          referrer String
+          user_agent String
         ) ENGINE = MergeTree()
         ORDER BY (short_code, click_time)
       `,

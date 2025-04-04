@@ -256,6 +256,9 @@ export class AuthService {
 
 		await this.usersService.updatePassword(userId, newPassword);
 
+		// Mark reset password token as used
+		await this.redisService.del(`reset_token:${userId}`);
+
 		return {
 			message: 'Password changed successfully',
 		};

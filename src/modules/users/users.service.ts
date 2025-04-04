@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { User } from './entities/user.entity';
 import * as bcrypt from 'bcrypt';
@@ -12,7 +12,7 @@ export class UsersService {
 		const client = this.databaseService.getClient();
 
 		// Check if user already exists
-		const existingUser = await client.execute('SELECT * FROM users WHERE email = ?', [userData.email], {
+		const existingUser = await client.execute('SELECT * FROM link_users WHERE email = ?', [userData.email], {
 			prepare: true,
 		});
 
@@ -28,7 +28,7 @@ export class UsersService {
 
 		// Create user with is_active = false
 		await client.execute(
-			`INSERT INTO users (
+			`INSERT INTO link_users (
         id, email, password, full_name, created_at, updated_at, is_active
       ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
 			[userId, userData.email, hashedPassword, userData.fullName, now, now, false],
@@ -39,7 +39,6 @@ export class UsersService {
 			id: userId,
 			email: userData.email,
 			fullName: userData.fullName,
-			password: undefined, // Don't return password
 			createdAt: now,
 			updatedAt: now,
 			isActive: false,
@@ -49,7 +48,7 @@ export class UsersService {
 	async findByEmail(email: string): Promise<User | null> {
 		const client = this.databaseService.getClient();
 
-		const result = await client.execute('SELECT * FROM users WHERE email = ?', [email], { prepare: true });
+		const result = await client.execute('SELECT * FROM link_users WHERE email = ?', [email], { prepare: true });
 
 		if (result.rows.length === 0) {
 			return null;
@@ -59,7 +58,6 @@ export class UsersService {
 		return {
 			id: user.id,
 			email: user.email,
-			password: user.password, // Include password for auth service
 			fullName: user.full_name,
 			createdAt: user.created_at,
 			updatedAt: user.updated_at,
@@ -71,7 +69,7 @@ export class UsersService {
 	async findById(id: string): Promise<User | null> {
 		const client = this.databaseService.getClient();
 
-		const result = await client.execute('SELECT * FROM users WHERE id = ?', [id], { prepare: true });
+		const result = await client.execute('SELECT * FROM link_users WHERE id = ?', [id], { prepare: true });
 
 		if (result.rows.length === 0) {
 			return null;
@@ -81,7 +79,6 @@ export class UsersService {
 		return {
 			id: user.id,
 			email: user.email,
-			password: undefined, // Don't include password
 			fullName: user.full_name,
 			createdAt: user.created_at,
 			updatedAt: user.updated_at,
@@ -95,8 +92,20 @@ export class UsersService {
 
 		const hashedPassword = await bcrypt.hash(newPassword, 10);
 
+		const currentPassword = await client.execute('SELECT password FROM link_users WHERE id = ?', [userId], {
+			prepare: true,
+		});
+
+		if (!currentPassword.rows.length) {
+			throw new NotFoundException('User not found');
+		}
+
+		if (currentPassword.rows[0].password === hashedPassword) {
+			throw new BadRequestException('New password cannot be the same as the current password');
+		}
+
 		await client.execute(
-			'UPDATE users SET password = ?, updated_at = ? WHERE id = ?',
+			'UPDATE link_users SET password = ?, updated_at = ? WHERE id = ?',
 			[hashedPassword, new Date(), userId],
 			{ prepare: true },
 		);
@@ -107,6 +116,6 @@ export class UsersService {
 	async activateUser(userId: string): Promise<void> {
 		const client = this.databaseService.getClient();
 
-		await client.execute('UPDATE users SET is_active = true WHERE id = ?', [userId], { prepare: true });
+		await client.execute('UPDATE link_users SET is_active = true WHERE id = ?', [userId], { prepare: true });
 	}
 }

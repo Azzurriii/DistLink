@@ -9,7 +9,6 @@ interface ClickEvent {
 	metadata: {
 		userAgent?: string;
 		ip?: string;
-		referer?: string;
 		country?: string;
 	};
 }
@@ -277,9 +276,13 @@ export class ClickProcessorService implements OnModuleDestroy {
 
 			// Perform individual queries instead of batch
 			const promises = Array.from(clickCounts.entries()).map(([shortCode, count]) =>
-				client.execute('UPDATE url_clicks SET clicks = clicks + ? WHERE short_code = ?', [count, shortCode], {
-					prepare: true,
-				}),
+				client.execute(
+					'UPDATE link_click_counter SET clicks = clicks + ? WHERE short_code = ?',
+					[count, shortCode],
+					{
+						prepare: true,
+					},
+				),
 			);
 
 			await Promise.all(promises);

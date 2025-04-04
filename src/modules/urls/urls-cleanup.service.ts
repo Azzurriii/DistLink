@@ -19,7 +19,7 @@ export class UrlsCleanupService {
 
 		try {
 			const result = await client.execute(
-				'SELECT short_code FROM urls WHERE expires_at < toTimestamp(now())',
+				'SELECT short_code FROM link_urls WHERE expires_at < toTimestamp(now())',
 				[],
 				{ prepare: true },
 			);
@@ -33,12 +33,12 @@ export class UrlsCleanupService {
 
 			await Promise.all([
 				...expiredCodes.map((code) =>
-					client.execute('DELETE FROM urls WHERE short_code = ?', [code], {
+					client.execute('DELETE FROM link_urls WHERE short_code = ?', [code], {
 						prepare: true,
 					}),
 				),
 				...expiredCodes.map((code) =>
-					client.execute('DELETE FROM url_clicks WHERE short_code = ?', [code], { prepare: true }),
+					client.execute('DELETE FROM link_click_counter WHERE short_code = ?', [code], { prepare: true }),
 				),
 				...expiredCodes.map((code) => this.redisService.del(`url:${code}`)),
 			]);
