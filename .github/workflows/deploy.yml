@@ -7,7 +7,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: self-hosted  # Run on VM with self-hosted runner.
+    runs-on: self-hosted  # Run on VM with self-hosted runner
     steps:
       - name: Checkout code
         uses: actions/checkout@v4  # Get source code into _work/<repo-name>/<repo-name>
