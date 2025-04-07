@@ -57,7 +57,6 @@ jobs:
                   docker stop distlink-app || true
                   docker rm distlink-app || true
 
-<<<<<<< HEAD
                   # Build and run new application
                   docker build -t dist-link:latest .
                   docker run -d --name distlink-app \
@@ -65,12 +64,3 @@ jobs:
                     -p 8000:8000 \
                     --env-file .env \
                     dist-link:latest
-=======
-          # Build and run new application
-          docker build -t dist-link:latest .
-          docker run -d --name distlink-app \
-            --network distlink-network \
-            -p 8000:8000 \
-            --env-file .env \
-            dist-link:latest
->>>>>>> 03893eafabd4548d7a381ecd0396b45cb007fb73
