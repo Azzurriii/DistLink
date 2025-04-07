@@ -78,6 +78,7 @@ export class DatabaseService implements OnModuleInit {
 					password text,
 					full_name text,
 					is_active boolean,
+					google_id text,
 					created_at timestamp,
 					updated_at timestamp
 				)
@@ -85,6 +86,10 @@ export class DatabaseService implements OnModuleInit {
 
 			await this.client.execute(`
 				CREATE INDEX IF NOT EXISTS link_users_email_idx ON link_users (email)
+			`);
+
+			await this.client.execute(`
+				CREATE INDEX IF NOT EXISTS link_users_google_id_idx ON link_users (google_id)
 			`);
 
 			await this.client.execute(`

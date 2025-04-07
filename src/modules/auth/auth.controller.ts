@@ -1,9 +1,17 @@
-import { Controller, Post, Body, Get, UseGuards, Req, HttpCode, HttpStatus, Param, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import { Controller, Post, Body, Get, UseGuards, Req, HttpCode, HttpStatus, Param, Query, Res } from '@nestjs/common';
+import {
+	ApiTags,
+	ApiOperation,
+	ApiResponse,
+	ApiBody,
+	ApiBearerAuth,
+	ApiParam,
+	ApiExcludeEndpoint,
+} from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { Request } from 'express';
-
+import { Request, Response } from 'express';
+import { GoogleAuthGuard } from './guards/google-auth.guard';
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
@@ -326,5 +334,30 @@ export class AuthController {
 			changePasswordDto.currentPassword,
 			changePasswordDto.newPassword,
 		);
+	}
+
+	@Get('google')
+	@UseGuards(GoogleAuthGuard)
+	@ApiOperation({ summary: 'Initiate Google OAuth flow' })
+	@ApiResponse({ status: 302, description: 'Redirects to Google for authentication' })
+	async googleAuth(@Req() req) {
+		// Initiates the Google OAuth2 login flow handled by passport-google-oauth20
+	}
+
+	@Get('google-callback')
+	@UseGuards(GoogleAuthGuard)
+	@ApiOperation({ summary: 'Google OAuth2 callback' })
+	@ApiExcludeEndpoint()
+	async googleAuthRedirect(@Req() req: Request, @Res() res: Response) {
+		const user = req.user as any;
+
+		if (!user) {
+			return res.redirect('/login/error');
+		}
+
+		const loginResult = await this.authService.loginWithGoogle(user);
+
+		const redirectUrl = `${process.env.FRONTEND_URL}/auth/callback?accessToken=${loginResult.accessToken}&refreshToken=${loginResult.refreshToken}`;
+		res.redirect(redirectUrl);
 	}
 }

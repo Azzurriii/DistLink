@@ -4,7 +4,8 @@ export class User {
 	id: string;
 	fullName: string;
 	email: string;
-	password: string;
+	password?: string;
+	googleId?: string;
 	createdAt: Date;
 	updatedAt: Date;
 	deletedAt?: Date;

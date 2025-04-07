@@ -1,10 +1,11 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { RedisService } from '../redis/redis.service';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service';
 import { EmailQueueService } from '../queue/services/email-queue.service';
+import { CreateUserDto } from '../users/dto/create-user.dto';
 
 @Injectable()
 export class AuthService {
@@ -188,6 +189,72 @@ export class AuthService {
 		} catch (error) {
 			throw new BadRequestException('Invalid or expired reset token');
 		}
+	}
+
+	async validateGoogleUser(details: {
+		email: string;
+		firstName?: string;
+		lastName?: string;
+		picture?: string;
+		googleId: string;
+		accessToken: string;
+	}) {
+		let user = await this.usersService.findByGoogleId(details.googleId);
+
+		const profileData = {
+			fullName: `${details.firstName || ''} ${details.lastName || ''}`.trim(),
+		};
+
+		if (user) {
+			console.log(`Found user by Google ID: ${user.id}. Updating profile if necessary.`);
+			user = await this.usersService.updateGoogleProfile(user.id, profileData);
+			return user;
+		}
+
+		// No user found by googleId, check by email for potential linking
+		console.log(`No user found for Google ID ${details.googleId}. Checking email: ${details.email}`);
+		const existingUserByEmail = await this.usersService.findByEmail(details.email);
+
+		if (existingUserByEmail) {
+			if (!existingUserByEmail.googleId) {
+				// Link the Google account to the existing email account
+				user = await this.usersService.linkGoogleId(existingUserByEmail.id, details.googleId);
+				user = await this.usersService.updateGoogleProfile(user.id, profileData);
+				return user;
+			} else {
+				// Email is associated with another Google account. Throw error.
+				console.error(
+					`Conflict: Email ${details.email} already linked to Google ID ${existingUserByEmail.googleId}, cannot link to ${details.googleId}.`,
+				);
+				throw new ConflictException('This email is already associated with a different Google account.');
+			}
+		}
+
+		// No user found by googleId or email, create a new user
+		const newUserDto: Partial<CreateUserDto> = {
+			email: details.email,
+			fullName: profileData.fullName,
+			googleId: details.googleId,
+			isActive: true,
+		};
+		user = await this.usersService.createFromGoogle(newUserDto);
+		return user;
+	}
+
+	async loginWithGoogle(user: any) {
+		// User is already validated/created by validateGoogleUser
+		// We just need to generate tokens
+		if (!user) {
+			throw new UnauthorizedException('Google authentication failed');
+		}
+
+		const tokens = await this.generateTokens(user);
+		await this.storeRefreshToken(user.id, tokens.refreshToken);
+
+		return {
+			user,
+			...tokens,
+		};
 	}
 
 	private async generateTokens(user: any) {

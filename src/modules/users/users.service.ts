@@ -1,6 +1,7 @@
 import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { User } from './entities/user.entity';
+import { CreateUserDto } from './dto/create-user.dto';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -67,6 +68,30 @@ export class UsersService {
 		} as User;
 	}
 
+	async findByGoogleId(googleId: string): Promise<User | null> {
+		const client = this.databaseService.getClient();
+		const result = await client.execute('SELECT * FROM link_users WHERE google_id = ?', [googleId], {
+			prepare: true,
+		});
+
+		if (result.rows.length === 0) {
+			return null;
+		}
+
+		const user = result.first();
+		return {
+			id: user.id,
+			email: user.email,
+			password: user.password,
+			fullName: user.full_name,
+			googleId: user.google_id,
+			createdAt: user.created_at,
+			updatedAt: user.updated_at,
+			deletedAt: user.deleted_at,
+			isActive: user.is_active,
+		} as User;
+	}
+
 	async findById(id: string): Promise<User | null> {
 		const client = this.databaseService.getClient();
 
@@ -82,6 +107,7 @@ export class UsersService {
 			email: user.email,
 			password: user.password,
 			fullName: user.full_name,
+			googleId: user.google_id,
 			createdAt: user.created_at,
 			updatedAt: user.updated_at,
 			deletedAt: user.deleted_at,
@@ -119,5 +145,84 @@ export class UsersService {
 		const client = this.databaseService.getClient();
 
 		await client.execute('UPDATE link_users SET is_active = true WHERE id = ?', [userId], { prepare: true });
+	}
+
+	async createFromGoogle(userData: Partial<CreateUserDto>): Promise<User> {
+		const client = this.databaseService.getClient();
+		const userId = uuidv4();
+		const now = new Date();
+
+		// Create user directly active, without password
+		await client.execute(
+			`INSERT INTO link_users (
+        id, email, full_name, google_id, created_at, updated_at, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			[
+				userId,
+				userData.email,
+				userData.fullName,
+				userData.googleId,
+				now,
+				now,
+				true, // Directly active
+			],
+			{ prepare: true },
+		);
+
+		return {
+			id: userId,
+			email: userData.email,
+			fullName: userData.fullName,
+			googleId: userData.googleId,
+			createdAt: now,
+			updatedAt: now,
+			isActive: true,
+		} as User;
+	}
+
+	async linkGoogleId(userId: string, googleId: string): Promise<User> {
+		const client = this.databaseService.getClient();
+		const now = new Date();
+
+		// Check if this googleId is already linked to another account
+		const existingGoogleLink = await this.findByGoogleId(googleId);
+		if (existingGoogleLink && existingGoogleLink.id !== userId) {
+			throw new ConflictException('This Google account is already linked to another user.');
+		}
+
+		// Update the user record with the Google ID and potentially activate if not already
+		await client.execute(
+			'UPDATE link_users SET google_id = ?, updated_at = ?, is_active = true WHERE id = ?',
+			[googleId, now, userId],
+			{ prepare: true },
+		);
+
+		// Return the updated user information
+		const updatedUser = await this.findById(userId);
+		if (!updatedUser) {
+			throw new NotFoundException('User not found after update');
+		}
+		return updatedUser;
+	}
+
+	async updateGoogleProfile(
+		userId: string,
+		profileData: { fullName: string /* Add picture if needed */ },
+	): Promise<User> {
+		const client = this.databaseService.getClient();
+		const now = new Date();
+
+		// Add other fields to update as necessary (e.g., picture)
+		await client.execute(
+			'UPDATE link_users SET full_name = ?, updated_at = ? WHERE id = ?',
+			[profileData.fullName, now, userId],
+			{ prepare: true },
+		);
+
+		const updatedUser = await this.findById(userId);
+		if (!updatedUser) {
+			throw new NotFoundException('User not found after profile update');
+		}
+		return updatedUser;
 	}
 }
